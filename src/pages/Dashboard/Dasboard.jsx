@@ -1,40 +1,42 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import toast from 'react-hot-toast';
-import { 
-  Search, 
-  RotateCcw, 
-  Box, 
-  Tag, 
-  Layers, 
-  DollarSign, 
-  Activity, 
-  Filter, 
-  ClipboardList, 
-  Blocks, 
-  ShieldCheck, 
-  CheckCircle, 
+import {
+  Search,
+  RotateCcw,
+  Box,
+  Tag,
+  Layers,
+  DollarSign,
+  Activity,
+  Filter,
+  ClipboardList,
+  Blocks,
+  ShieldCheck,
+  CheckCircle,
   AlertTriangle,
   ChevronRight,
   TrendingUp,
   Package
 } from 'lucide-react';
-import { 
-  ResponsiveContainer, 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  Tooltip, 
-  CartesianGrid, 
-  Legend, 
-  PieChart, 
-  Pie, 
-  Cell 
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  Legend,
+  PieChart,
+  Pie,
+  Cell
 } from 'recharts';
 import DataTable from '../../components/DataTable';
 import SearchableDropdown from '../../components/SearchableDropdown';
 
 import { SEEDED_ITEMS } from '../../utils/seeds';
+
+import { productionAPI } from '../../services/api';
 
 const SEEDED_TRANSACTIONS = [
   { id: 'tx-001', serialNo: 'TX-001', date: '2026-06-01', type: 'Purchase', itemCode: 'IT-001', itemName: 'Screwdriver Set 12pcs', category: 'Hardware & Tools', brand: 'Bosch', price: 850, qty: 150, totalPrice: 127500 },
@@ -50,40 +52,14 @@ const SEEDED_TRANSACTIONS = [
 ];
 
 export default function Dasboard() {
-  const [masterItems, setMasterItems] = useState(() => {
-    const saved = localStorage.getItem('master_items');
-    if (saved) return JSON.parse(saved);
-    localStorage.setItem('master_items', JSON.stringify(SEEDED_ITEMS));
-    return SEEDED_ITEMS;
-  });
+  const masterItems = SEEDED_ITEMS;
 
-  const [transactions, setTransactions] = useState(() => {
-    const saved = localStorage.getItem('inventory_transactions');
-    if (saved) return JSON.parse(saved);
-    localStorage.setItem('inventory_transactions', JSON.stringify(SEEDED_TRANSACTIONS));
-    return SEEDED_TRANSACTIONS;
-  });
-
-  // Load other modules data for full-system metrics
-  const [orders, setOrders] = useState(() => {
-    const saved = localStorage.getItem('production_orders');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [kittingHistory, setKittingHistory] = useState(() => {
-    const saved = localStorage.getItem('kitting_history');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [productionHistory, setProductionHistory] = useState(() => {
-    const saved = localStorage.getItem('actual_production_history');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [testingHistory, setTestingHistory] = useState(() => {
-    const saved = localStorage.getItem('testing_history');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [loading, setLoading] = useState(true);
+  const [orders, setOrders] = useState([]);
+  const [kittingHistory, setKittingHistory] = useState([]);
+  const [productionHistory, setProductionHistory] = useState([]);
+  const [testingHistory, setTestingHistory] = useState([]);
+  const [inventory, setInventory] = useState([]);
 
   const [showMobileFilters, setShowMobileFilters] = useState(false);
 
@@ -98,34 +74,57 @@ export default function Dasboard() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
 
-  // Sync state with storage updates
   useEffect(() => {
-    const refreshData = () => {
-      const savedMaster = localStorage.getItem('master_items');
-      if (savedMaster) setMasterItems(JSON.parse(savedMaster));
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const [ordersRes, kittingRes, prodRes, testingRes, inventoryRes] = await Promise.all([
+          productionAPI.getProductionOrders(),
+          productionAPI.getKittingApprovalHistory(),
+          productionAPI.getActualProduction(),
+          productionAPI.getTestingHistory(),
+          productionAPI.getInventory()
+        ]);
 
-      const savedTx = localStorage.getItem('inventory_transactions');
-      if (savedTx) setTransactions(JSON.parse(savedTx));
-
-      const savedOrders = localStorage.getItem('production_orders');
-      if (savedOrders) setOrders(JSON.parse(savedOrders));
-
-      const savedKitting = localStorage.getItem('kitting_history');
-      if (savedKitting) setKittingHistory(JSON.parse(savedKitting));
-
-      const savedProd = localStorage.getItem('actual_production_history');
-      if (savedProd) setProductionHistory(JSON.parse(savedProd));
-
-      const savedTesting = localStorage.getItem('testing_history');
-      if (savedTesting) setTestingHistory(JSON.parse(savedTesting));
+        if (ordersRes.success) {
+          setOrders(ordersRes.orders || []);
+        }
+        if (kittingRes.success) {
+          setKittingHistory(kittingRes.records || []);
+        }
+        if (prodRes.success) {
+          setProductionHistory(prodRes.records || []);
+        }
+        if (testingRes.success) {
+          setTestingHistory(testingRes.records || []);
+        }
+        if (inventoryRes.success) {
+          let fetchedData = inventoryRes.records || [];
+          const masterItemsList = SEEDED_ITEMS;
+          let updated = [...fetchedData];
+          masterItemsList.forEach(item => {
+            const exists = updated.some(inv => inv.productCode === item.code);
+            if (!exists) {
+              updated.push({
+                productCode: item.code,
+                productName: item.name,
+                maxLevel: 500,
+                prodGroup: item.category,
+                closingStock: 0
+              });
+            }
+          });
+          setInventory(updated);
+        }
+      } catch (err) {
+        console.error('Failed to fetch dashboard metrics:', err);
+        toast.error('Failed to load dashboard metrics from spreadsheet');
+      } finally {
+        setLoading(false);
+      }
     };
 
-    window.addEventListener('storage', refreshData);
-    window.addEventListener('focus', refreshData);
-    return () => {
-      window.removeEventListener('storage', refreshData);
-      window.removeEventListener('focus', refreshData);
-    };
+    fetchData();
   }, []);
 
   const handleClearFilters = () => {
@@ -150,44 +149,30 @@ export default function Dasboard() {
 
   // Compute live stock summary metrics
   const computedStocks = useMemo(() => {
-    return masterItems.map(item => {
-      const openingQty = 0;
+    return inventory.map(item => {
+      // Find matching item in SEEDED_ITEMS to extract brand and price
+      const seedItem = masterItems.find(si => si.code === item.productCode) || {};
 
-      // Extract transaction aggregates
-      const itemTx = transactions.filter(t => t.itemCode === item.code);
-
-      const purchaseQty = itemTx
-        .filter(t => t.type === 'Purchase')
-        .reduce((sum, t) => sum + (Number(t.qty) || 0), 0);
-
-      const salesQty = itemTx
-        .filter(t => t.type === 'Sales')
-        .reduce((sum, t) => sum + (Number(t.qty) || 0), 0);
-
-      const purchaseReturnQty = itemTx
-        .filter(t => t.type === 'Purchase Return')
-        .reduce((sum, t) => sum + (Number(t.qty) || 0), 0);
-
-      const salesReturnQty = itemTx
-        .filter(t => t.type === 'Sales Return')
-        .reduce((sum, t) => sum + (Number(t.qty) || 0), 0);
-
-      // Current Qty = Opening + Purchase - Sales - Purchase Return + Sales Return
-      const currentQty = openingQty + purchaseQty - salesQty - purchaseReturnQty + salesReturnQty;
-      const stockLevel = currentQty >= 30 ? 'Stock Full' : 'Stock Low';
+      const currentQty = Number(item.closingStock) || 0;
+      const maxLevel = Number(item.maxLevel) || 500;
+      const stockLevel = currentQty >= maxLevel * 0.2 ? 'Stock Full' : 'Stock Low';
 
       return {
-        ...item,
-        openingQty,
-        purchaseQty,
-        salesQty,
-        purchaseReturnQty,
-        salesReturnQty,
-        currentQty,
-        stockLevel
+        code: item.productCode,
+        name: item.productName,
+        category: item.prodGroup || seedItem.category || 'General',
+        brand: seedItem.brand || 'General',
+        price: seedItem.price || 0,
+        openingQty: 0,
+        purchaseQty: 0,
+        salesQty: 0,
+        purchaseReturnQty: 0,
+        salesReturnQty: 0,
+        currentQty: currentQty,
+        stockLevel: stockLevel
       };
     });
-  }, [masterItems, transactions]);
+  }, [inventory, masterItems]);
 
   // Apply filters
   const filteredStocks = useMemo(() => {
@@ -228,7 +213,7 @@ export default function Dasboard() {
     const testingPassRate = totalTestedCount > 0 ? Math.round((approvedTestedCount / totalTestedCount) * 100) : 0;
 
     // Low stock count
-    const lowStockCount = computedStocks.filter(s => s.currentQty < 30).length;
+    const lowStockCount = computedStocks.filter(s => s.stockLevel === 'Stock Low').length;
 
     return {
       totalOrders,
@@ -267,7 +252,7 @@ export default function Dasboard() {
   const qaPieData = useMemo(() => {
     const approved = testingHistory.filter(t => t.testingStatus === 'Approved').length;
     const rejected = testingHistory.filter(t => t.testingStatus === 'Rejected').length;
-    
+
     // Default to seeded display if no testing history logs are found
     if (approved === 0 && rejected === 0) {
       return [
@@ -281,10 +266,10 @@ export default function Dasboard() {
     ];
   }, [testingHistory]);
 
-  // Find top 5 items running lowest on stock (< 30 items)
+  // Find top 5 items running lowest on stock (Stock Low)
   const lowStockAlertItems = useMemo(() => {
     return computedStocks
-      .filter(item => item.currentQty < 30)
+      .filter(item => item.stockLevel === 'Stock Low')
       .sort((a, b) => a.currentQty - b.currentQty)
       .slice(0, 5);
   }, [computedStocks]);
@@ -296,7 +281,7 @@ export default function Dasboard() {
   );
 
   const tableHeaders = [
-    "Serial No", "Item Code", "Item Name", "Category", "Brand", "Unit Price", 
+    "Serial No", "Item Code", "Item Name", "Category", "Brand", "Unit Price",
     "Opening Qty", "Purchase Qty", "Sales Qty", "Purchase Return Qty", "Sales Return Qty", "Current Qty", "Stock Level"
   ];
 
@@ -319,9 +304,8 @@ export default function Dasboard() {
         <td className="px-4 py-3 text-center text-xs text-emerald-500 font-bold whitespace-nowrap">+{item.salesReturnQty}</td>
         <td className="px-4 py-3 text-center text-xs text-indigo-600 font-black whitespace-nowrap bg-indigo-50/20">{item.currentQty}</td>
         <td className="px-4 py-3 text-center whitespace-nowrap text-xs">
-          <span className={`px-2.5 py-0.5 rounded text-[10px] uppercase font-black tracking-wider ${
-            isFull ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
-          }`}>
+          <span className={`px-2.5 py-0.5 rounded text-[10px] uppercase font-black tracking-wider ${isFull ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+            }`}>
             {item.stockLevel}
           </span>
         </td>
@@ -368,9 +352,8 @@ export default function Dasboard() {
 
         <div className="flex justify-between items-center border-t border-slate-100 pt-2 text-[11px]">
           <span className="text-gray-400 uppercase text-[8px]">Stock Status</span>
-          <span className={`px-2 py-0.5 rounded text-[8px] uppercase font-black ${
-            isFull ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
-          }`}>
+          <span className={`px-2 py-0.5 rounded text-[8px] uppercase font-black ${isFull ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+            }`}>
             {item.stockLevel}
           </span>
         </div>
@@ -441,14 +424,14 @@ export default function Dasboard() {
           <div>
             <span className="text-[10px] text-gray-400 uppercase tracking-wider font-extrabold block">Low Stock Alerts</span>
             <span className="text-xl font-black text-slate-800 block">{kpiStats.lowStockCount}</span>
-            <span className="text-[9px] text-rose-500 font-bold block mt-0.5">Items with stock &lt; 30</span>
+            <span className="text-[9px] text-rose-500 font-bold block mt-0.5">Stock below 20% of max level</span>
           </div>
         </div>
       </div>
 
       {/* Visual Analytics & Alerts Widgets */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
+
         {/* Category Stocks Volume Chart */}
         <div className="bg-white rounded-2xl border border-indigo-50 shadow-xs p-5 lg:col-span-2 space-y-3">
           <div className="flex justify-between items-center pb-2 border-b border-slate-50">
@@ -462,7 +445,7 @@ export default function Dasboard() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
                   <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: '#64748B', fontWeight: 600, fontSize: 10 }} />
                   <YAxis tickLine={false} axisLine={false} tick={{ fill: '#64748B', fontWeight: 600 }} />
-                  <Tooltip 
+                  <Tooltip
                     contentStyle={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                     labelStyle={{ fontWeight: 'extrabold', color: '#1E293B', textTransform: 'uppercase', fontSize: '11px' }}
                   />
@@ -538,8 +521,8 @@ export default function Dasboard() {
           <div className="flex-1 space-y-3 overflow-y-auto max-h-[300px] pr-1 scrollbar-thin">
             {lowStockAlertItems.length > 0 ? (
               lowStockAlertItems.map((item) => (
-                <div 
-                  key={item.code} 
+                <div
+                  key={item.code}
                   className="flex items-center justify-between p-3 rounded-xl bg-rose-50/30 border border-rose-100/40 hover:bg-rose-50 transition-colors"
                 >
                   <div className="space-y-0.5">
@@ -605,7 +588,7 @@ export default function Dasboard() {
                 className="w-full bg-white border border-gray-300 rounded-lg pl-8 pr-2 py-1.5 focus:outline-none focus:border-indigo-500 text-xs h-[32px]"
               />
             </div>
-            
+
             {/* Category Dropdown */}
             <div className="sm:col-span-1">
               <SearchableDropdown

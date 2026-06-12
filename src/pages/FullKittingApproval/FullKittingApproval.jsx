@@ -5,15 +5,13 @@ import ApprovalPending from './ApprovalPending';
 import ApprovalHistory from './ApprovalHistory';
 import ApprovalForm from './ApprovalForm';
 import { TabSwitcher } from '../../components/StandardButtons';
+import { productionAPI } from '../../services/api';
 
 export default function FullKittingApproval() {
   const [activeTab, setActiveTab] = useState('pending');
-  
-  // Load and manage kitting history (which contains all pending/approved/rejected cards)
-  const [kittingHistory, setKittingHistory] = useState(() => {
-    const saved = localStorage.getItem('kitting_history');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [orders, setOrders] = useState([]);
+  const [historyRecords, setHistoryRecords] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   // Filter Toolbar States
   const [searchQuery, setSearchQuery] = useState('');
@@ -22,31 +20,90 @@ export default function FullKittingApproval() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
 
-  // Keep state updated in case localStorage updates from other pages
-  useEffect(() => {
-    const handleStorageChange = () => {
-      const savedHistory = localStorage.getItem('kitting_history');
-      if (savedHistory) {
-        setKittingHistory(JSON.parse(savedHistory));
+  const fetchOrders = async () => {
+    setLoading(true);
+    try {
+      const result = await productionAPI.getProductionOrders();
+      if (result.success) {
+        const transformedOrders = result.orders.map(order => ({
+          id: order.sNo?.toString() || `po-${order.sNo}`,
+          sNo: order.sNo,
+          timestamp: order.timestamp,
+          productCode: order.productCode || '',
+          productName: order.productName || '',
+          baseCat: order.baseCat || '',
+          qty: Number(order.qty) || 0,
+          godown: order.godown || '',
+          rawNames: order.rawNames || '',
+          rawQuantities: order.rawQuantities || '',
+          fgAvailableQty: Number(order.fgAvailableQty) || 0,
+          totalRawRequiredQty: Number(order.totalRawRequiredQty) || 0,
+          totalRawCost: Number(order.totalRawCost) || 0,
+          extraAmount: Number(order.extraAmount) || 0,
+          totalProductionCost: Number(order.totalProductionCost) || 0,
+          sellingPrice: Number(order.sellingPrice) || 0,
+          profitLoss: Number(order.profitLoss) || 0,
+          profitLossPercent: Number(order.profitLossPercent) || 0,
+          costingImage: order.costingImage || '',
+          checkJc: order.checkJc || ''
+        }));
+        setOrders(transformedOrders);
+      } else {
+        toast.error(`Failed to load orders: ${result.error}`);
       }
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+
+      // Fetch history records from Kitting Approval History sheet
+      const historyResult = await productionAPI.getKittingApprovalHistory();
+      if (historyResult.success) {
+        setHistoryRecords(historyResult.records);
+      } else {
+        toast.error(`Failed to load approval history: ${historyResult.error}`);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to connect to spreadsheet');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchOrders();
   }, []);
 
-  // Filter: Pending Approvals (status is 'Pending' or not specified)
+  // Filter: Pending Approvals (status is 'Pending')
   const pendingApprovals = useMemo(() => {
-    return kittingHistory.filter(
-      h => !h.status || h.status === 'Pending'
-    );
-  }, [kittingHistory]);
+    return orders
+      .filter(o => o.baseCat === 'CUSTOMIZE ORDER' && o.rawNames && (!o.checkJc || o.checkJc === 'Pending' || o.checkJc === ''))
+      .map(o => ({
+        id: `kh-${o.sNo}`,
+        sNo: o.sNo,
+        timestamp: o.timestamp,
+        productCode: o.productCode,
+        productName: o.productName,
+        baseCat: o.baseCat,
+        qty: o.qty,
+        rawNames: o.rawNames,
+        rawQuantities: o.rawQuantities,
+        fgAvailableQty: o.fgAvailableQty,
+        totalRawRequiredQty: o.totalRawRequiredQty,
+        totalRawCost: o.totalRawCost,
+        extraAmount: o.extraAmount,
+        totalProductionCost: o.totalProductionCost,
+        sellingPrice: o.sellingPrice,
+        profitLoss: o.profitLoss,
+        profitLossPercent: o.profitLossPercent,
+        costingImage: o.costingImage,
+        status: 'Pending',
+        jobCardNo: '',
+        remarks: ''
+      }));
+  }, [orders]);
 
-  // Filter: Approval History (status is 'Approved' or 'Rejected')
+  // Filter: Approval History (from Kitting Approval History sheet)
   const approvedHistory = useMemo(() => {
-    return kittingHistory.filter(
-      h => h.status === 'Approved' || h.status === 'Rejected'
-    );
-  }, [kittingHistory]);
+    return historyRecords;
+  }, [historyRecords]);
 
   // Filter pending approvals by search term
   const filteredPending = useMemo(() => {
@@ -92,57 +149,55 @@ export default function FullKittingApproval() {
   };
 
   const handleOpenApprovalForm = (recordId) => {
-    const record = kittingHistory.find(h => h.id === recordId);
+    const record = pendingApprovals.find(h => h.id === recordId);
     if (record) {
       setSelectedRecord(record);
       setIsFormOpen(true);
     }
   };
 
-  const handleApproveDecision = (recordId, status, remarks) => {
-    // Update the record status inside kitting_history
-    const updatedHistory = kittingHistory.map(h => {
-      if (h.id === recordId) {
-        return {
-          ...h,
-          status,
-          jobCardNo: status === 'Approved' ? `JC-${h.sNo}` : '',
-          remarks
-        };
-      }
-      return h;
-    });
+  const handleApproveDecision = async (recordId, status, remarks) => {
+    const record = pendingApprovals.find(h => h.id === recordId);
+    if (!record) return;
 
-    setKittingHistory(updatedHistory);
-    localStorage.setItem('kitting_history', JSON.stringify(updatedHistory));
-    setIsFormOpen(false);
-    toast.success(`Costing record successfully ${status === 'Approved' ? 'approved' : 'rejected'}!`);
+    const sNos = String(record.sNo).split(',').map(s => Number(s.trim())).filter(Boolean);
+
+    const loadToast = toast.loading(`${status === 'Approved' ? 'Approving' : 'Rejecting'} costing card on Google Sheets...`);
+    try {
+      const result = await productionAPI.approveKittingData(sNos, status, remarks);
+      if (result.success) {
+        toast.success(`Costing record successfully ${status === 'Approved' ? 'approved' : 'rejected'}!`, { id: loadToast });
+        setIsFormOpen(false);
+        await fetchOrders();
+      } else {
+        toast.error(`Failed to update approval status: ${result.error}`, { id: loadToast });
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to submit approval status.', { id: loadToast });
+    }
   };
 
-  const handleDeleteHistory = (historyId) => {
+  const handleDeleteHistory = async (historyId) => {
     if (window.confirm('Are you sure you want to delete this approval history record? This will revert the production order back to Pending.')) {
-      const record = kittingHistory.find(h => h.id === historyId);
-      
-      if (record) {
-        // Load production orders to revert kitting status
-        const savedOrders = localStorage.getItem('production_orders');
-        if (savedOrders) {
-          const orders = JSON.parse(savedOrders);
-          const updatedOrders = orders.map(o => {
-            if (Number(o.sNo) === Number(record.sNo) || (o.productCode === record.productCode && o.timestamp === record.timestamp)) {
-              const { status, ...rest } = o; // strip 'Kitted' status
-              return rest;
-            }
-            return o;
-          });
-          localStorage.setItem('production_orders', JSON.stringify(updatedOrders));
-        }
-      }
+      const record = approvedHistory.find(h => h.id === historyId);
+      if (!record) return;
 
-      const updatedHistory = kittingHistory.filter(h => h.id !== historyId);
-      setKittingHistory(updatedHistory);
-      localStorage.setItem('kitting_history', JSON.stringify(updatedHistory));
-      toast.success('Approval record removed and order reverted to pending.');
+      const sNos = String(record.sNo).split(',').map(s => Number(s.trim())).filter(Boolean);
+
+      const loadToast = toast.loading('Reverting costing card and approval record...');
+      try {
+        const result = await productionAPI.clearKittingData(sNos);
+        if (result.success) {
+          toast.success('Approval record removed and order reverted to pending successfully!', { id: loadToast });
+          await fetchOrders();
+        } else {
+          toast.error(`Failed to revert record: ${result.error}`, { id: loadToast });
+        }
+      } catch (err) {
+        console.error(err);
+        toast.error('Failed to revert approval record.', { id: loadToast });
+      }
     }
   };
 
@@ -150,6 +205,17 @@ export default function FullKittingApproval() {
     { id: 'pending', label: 'Pending Approvals', count: pendingApprovals.length, icon: ClipboardCheck },
     { id: 'history', label: 'Approval History', count: approvedHistory.length, icon: History }
   ];
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading kitting approvals...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 sm:p-6 md:p-8 space-y-6 flex flex-col h-full min-h-0 bg-slate-50/30">

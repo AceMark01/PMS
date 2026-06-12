@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Layers, X, Plus, Calendar, Tag, Box, DollarSign, Calculator } from 'lucide-react';
 import SearchableDropdown from '../../components/SearchableDropdown';
 import ModalForm from '../../components/ModalForm';
+import { productionAPI } from '../../services/api';
+import { SEEDED_ITEMS } from '../../utils/seeds';
 
 export default function FullKittingForm({ isOpen, onClose, onSave, pendingOrders, initialOrderId }) {
   const [selectedProductName, setSelectedProductName] = useState('');
@@ -10,10 +12,37 @@ export default function FullKittingForm({ isOpen, onClose, onSave, pendingOrders
   const [fgAvailableQty, setFgAvailableQty] = useState('0');
   const [sellingPrice, setSellingPrice] = useState('0');
 
-  // Load raw materials and master items from local storage to calculate BOM
-  const rawMaterials = useMemo(() => {
-    const saved = localStorage.getItem('raw_materials');
-    return saved ? JSON.parse(saved) : [];
+  const [rawMaterials, setRawMaterials] = useState([]);
+  const [inventoryList, setInventoryList] = useState([]);
+  const [loadingBOM, setLoadingBOM] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      const loadData = async () => {
+        setLoadingBOM(true);
+        try {
+          const [bomResult, invResult] = await Promise.all([
+            productionAPI.getBOM(),
+            productionAPI.getInventory()
+          ]);
+          if (bomResult.success) {
+            setRawMaterials(bomResult.records || []);
+          } else {
+            console.error('Failed to fetch BOM:', bomResult.error);
+          }
+          if (invResult.success) {
+            setInventoryList(invResult.records || []);
+          } else {
+            console.error('Failed to fetch Inventory:', invResult.error);
+          }
+        } catch (err) {
+          console.error(err);
+        } finally {
+          setLoadingBOM(false);
+        }
+      };
+      loadData();
+    }
   }, [isOpen]);
 
   // Load unique list of raw materials for dropdown options
@@ -29,10 +58,7 @@ export default function FullKittingForm({ isOpen, onClose, onSave, pendingOrders
     return unique.sort((a, b) => a.rawItemName.localeCompare(b.rawItemName));
   }, [rawMaterials]);
 
-  const masterItems = useMemo(() => {
-    const saved = localStorage.getItem('master_items');
-    return saved ? JSON.parse(saved) : [];
-  }, [isOpen]);
+  const masterItems = SEEDED_ITEMS;
 
   // Unique list of product names from pendingOrders
   const productNamesOptions = useMemo(() => {
@@ -69,8 +95,17 @@ export default function FullKittingForm({ isOpen, onClose, onSave, pendingOrders
   // Find BOM components for the selected product
   const bomComponents = useMemo(() => {
     if (!selectedOrder) return [];
+    // Match by code: rm.fgCode (from bom sheet) === selectedOrder.productCode (from PRODUCTION_ORDERS sheet)
+    const matchedByCode = rawMaterials.filter(
+      rm => rm.fgCode && selectedOrder.productCode &&
+        rm.fgCode.trim().toLowerCase() === selectedOrder.productCode.trim().toLowerCase()
+    );
+    if (matchedByCode.length > 0) return matchedByCode;
+
+    // Fallback to matching by product name (case-insensitive)
     return rawMaterials.filter(
-      rm => rm.productName.toLowerCase() === selectedOrder.productName.toLowerCase()
+      rm => rm.productName && selectedOrder.productName &&
+        rm.productName.trim().toLowerCase() === selectedOrder.productName.trim().toLowerCase()
     );
   }, [selectedOrder, rawMaterials]);
 
@@ -99,29 +134,11 @@ export default function FullKittingForm({ isOpen, onClose, onSave, pendingOrders
     }
   }, [isOpen, initialOrderId, pendingOrders]);
 
-  // Pre-populate selling price and FG Available Qty when selected product or matching orders change
   useEffect(() => {
     setIsExtraManuallyEdited(false);
     if (selectedOrder) {
       setSellingPrice((finishedGoodPrice * totalQty).toFixed(2));
-      
-      const savedInventory = localStorage.getItem('inventory_status');
-      let inventoryList = [];
-      if (savedInventory) {
-        inventoryList = JSON.parse(savedInventory);
-      } else {
-        const masterSaved = localStorage.getItem('master_items');
-        const masterItems = masterSaved ? JSON.parse(masterSaved) : [];
-        inventoryList = masterItems.map((item, idx) => ({
-          productCode: item.code,
-          productName: item.name,
-          maxLevel: 500 + (idx % 5) * 100,
-          prodGroup: item.category,
-          closingStock: 100 + (idx % 7) * 45
-        }));
-        localStorage.setItem('inventory_status', JSON.stringify(inventoryList));
-      }
-      
+
       const invItem = inventoryList.find(item => item.productCode === selectedOrder.productCode);
       const autofillQty = invItem ? String(invItem.maxLevel || 0) : '0';
       setFgAvailableQty(autofillQty);
@@ -129,7 +146,7 @@ export default function FullKittingForm({ isOpen, onClose, onSave, pendingOrders
       setSellingPrice('0');
       setFgAvailableQty('0');
     }
-  }, [selectedOrder, finishedGoodPrice, totalQty]);
+  }, [selectedOrder, finishedGoodPrice, totalQty, inventoryList]);
 
   const [editedTableData, setEditedTableData] = useState([]);
 
@@ -176,7 +193,7 @@ export default function FullKittingForm({ isOpen, onClose, onSave, pendingOrders
     const updated = editedTableData.map((row, idx) => {
       if (idx === index) {
         const newRow = { ...row, [field]: field === 'checked' ? value : (Number(value) || 0) };
-        
+
         // Recalculate related fields
         if (field === 'rawQty' || field === 'availableQty') {
           newRow.indentQty = Number(Math.max(0, newRow.rawQty - newRow.availableQty).toFixed(4));
@@ -188,7 +205,7 @@ export default function FullKittingForm({ isOpen, onClose, onSave, pendingOrders
           // If they edit rawCost directly, update the costPerUnit as well
           newRow.costPerUnit = newRow.rawQty > 0 ? Number((newRow.rawCost / newRow.rawQty).toFixed(4)) : 0;
         }
-        
+
         return newRow;
       }
       return row;
@@ -359,292 +376,298 @@ export default function FullKittingForm({ isOpen, onClose, onSave, pendingOrders
       maxWidth="max-w-6xl"
     >
       <div className="space-y-5 min-h-[380px]">
-        
-        {/* Dropdown & Text selectors */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="space-y-1">
-            <label className="block text-[11px] md:text-[13px] text-gray-700 uppercase tracking-tight font-bold">Product name *</label>
-            <SearchableDropdown
-              options={productNamesOptions}
-              value={selectedProductName}
-              onChange={setSelectedProductName}
-              placeholder="Search Product Name"
-              className="w-full"
-              height="h-[36px]"
-              rounded="rounded"
-            />
+        {loadingBOM ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mb-3"></div>
+            <p className="text-gray-500 text-sm">Fetching BOM configuration from Google Sheets...</p>
           </div>
-
-          <div className="space-y-1">
-            <label className="block text-[11px] md:text-[13px] text-gray-700 uppercase tracking-tight font-bold">S No</label>
-            <input
-              type="text"
-              value={sNoText}
-              className="w-full px-3 py-1.5 border border-gray-200 bg-gray-50 text-gray-500 font-semibold rounded cursor-not-allowed text-xs h-[36px] outline-none text-center"
-              readOnly
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="block text-[11px] md:text-[13px] text-gray-700 uppercase tracking-tight font-bold">Plan Qty</label>
-            <input
-              type="text"
-              value={planQtyText}
-              className="w-full px-3 py-1.5 border border-gray-200 bg-gray-50 text-gray-500 font-semibold rounded cursor-not-allowed text-xs h-[36px] outline-none text-center"
-              readOnly
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="block text-[11px] md:text-[13px] text-gray-700 uppercase tracking-tight font-bold">Total Plan Qty</label>
-            <input
-              type="text"
-              value={totalQty ? totalQty.toLocaleString('en-IN') : '0'}
-              className="w-full px-3 py-1.5 border border-indigo-200 bg-indigo-50 text-indigo-700 font-black rounded cursor-not-allowed text-xs h-[36px] outline-none text-center"
-              readOnly
-            />
-          </div>
-        </div>
-
-        {selectedOrder && (
+        ) : (
           <>
-            {/* BOM Table */}
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">BOM Components Required</h4>
-                <button
-                  type="button"
-                  onClick={handleAddRow}
-                  className="flex items-center gap-1 px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded font-black text-[10px] uppercase transition active:scale-95 border border-indigo-200"
-                >
-                  <Plus size={11} />
-                  <span>Add Extra Material</span>
-                </button>
+            {/* Dropdown & Text selectors */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="space-y-1">
+                <label className="block text-[11px] md:text-[13px] text-gray-700 uppercase tracking-tight font-bold">Product name *</label>
+                <SearchableDropdown
+                  options={productNamesOptions}
+                  value={selectedProductName}
+                  onChange={setSelectedProductName}
+                  placeholder="Search Product Name"
+                  className="w-full"
+                  height="h-[36px]"
+                  rounded="rounded"
+                />
               </div>
-              <div className="border border-indigo-50 rounded-lg overflow-hidden shadow-sm bg-white overflow-x-auto">
-                <table className="w-full min-w-[700px] text-xs">
-                  <thead className="bg-slate-50 border-b border-indigo-50">
-                    <tr className="text-slate-600 font-semibold uppercase">
-                      <th className="px-4 py-2.5 text-center w-12">Select</th>
-                      <th className="px-4 py-2.5 text-center">Required BOM(Raw Material Name)</th>
-                      <th className="px-4 py-2.5 text-center">Raw Qty</th>
-                      <th className="px-4 py-2.5 text-center">Raw Cost</th>
-                      <th className="px-4 py-2.5 text-center">Available Raw Qty</th>
-                      <th className="px-4 py-2.5 text-center">Indent Qty</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-indigo-50">
-                    {editedTableData.length > 0 ? (
-                      editedTableData.map((row, index) => {
-                        const isShortage = row.indentQty > 0;
-                        return (
-                          <tr key={index} className={`transition-all duration-200 ${row.checked ? 'bg-emerald-50/20 text-slate-400 opacity-60' : 'hover:bg-slate-50/50'}`}>
-                            {/* Checkbox selector column in start */}
-                            <td className="px-4 py-2.5 text-center">
-                              <input
-                                type="checkbox"
-                                checked={row.checked || false}
-                                onChange={(e) => handleCellChange(index, 'checked', e.target.checked)}
-                                className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer transition-transform active:scale-95"
-                                title="Mark as Checked"
-                              />
-                            </td>
-                            {/* Required BOM(Raw Material Name) */}
-                            <td className="px-4 py-2.5 text-center font-medium text-slate-900">
-                              {row.isCustom ? (
-                                <select
-                                  value={row.rawName}
-                                  onChange={(e) => handleSelectRawMaterial(index, e.target.value)}
-                                  className="w-full max-w-[200px] px-2 py-1 border border-gray-200 rounded text-center focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 text-xs font-semibold text-slate-800 bg-white inline-block"
-                                  required
-                                >
-                                  <option value="">-- Select Material --</option>
-                                  {uniqueRawMaterials.map((m, mIdx) => (
-                                    <option key={mIdx} value={m.rawItemName}>{m.rawItemName}</option>
-                                  ))}
-                                </select>
-                              ) : (
-                                `${row.rawName} (${row.itemCode})`
-                              )}
-                            </td>
-                            {/* Raw Qty */}
-                            <td className="px-4 py-2.5 text-center">
-                              <div className="flex items-center justify-center gap-1.5">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="0.0001"
-                                  value={row.rawQty}
-                                  onChange={(e) => handleCellChange(index, 'rawQty', e.target.value)}
-                                  className="w-24 px-2 py-1 border border-gray-200 rounded text-center focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 text-xs font-bold text-indigo-600 bg-white"
-                                  required
-                                />
-                                <span className="text-gray-400 font-semibold">{row.unit}</span>
-                              </div>
-                            </td>
-                            {/* Raw Cost */}
-                            <td className="px-4 py-2.5 text-center">
-                              <div className="relative inline-block w-28">
-                                <span className="absolute left-2 top-1 text-gray-400 font-semibold">₹</span>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  value={row.rawCost}
-                                  onChange={(e) => handleCellChange(index, 'rawCost', e.target.value)}
-                                  className="w-full pl-6 pr-2 py-1 border border-gray-200 rounded text-center focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 text-xs font-bold text-slate-700 bg-white"
-                                  required
-                                />
-                              </div>
-                            </td>
-                            {/* Available Raw Qty */}
-                            <td className="px-4 py-2.5 text-center">
-                              <div className="flex items-center justify-center gap-1.5">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="0.0001"
-                                  value={row.availableQty}
-                                  onChange={(e) => handleCellChange(index, 'availableQty', e.target.value)}
-                                  className="w-24 px-2 py-1 border border-gray-200 rounded text-center focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 text-xs text-slate-600 font-semibold bg-white"
-                                  required
-                                />
-                                <span className="text-gray-400 font-semibold">{row.unit}</span>
-                              </div>
-                            </td>
-                            {/* Indent Qty */}
-                            <td className="px-4 py-2.5 text-center">
-                              <span className={`px-2 py-0.5 rounded text-[10px] font-black ${
-                                isShortage ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'
-                              }`}>
-                                {row.indentQty > 0 ? `${row.indentQty} ${row.unit}` : 'Nil'}
-                              </span>
+
+              <div className="space-y-1">
+                <label className="block text-[11px] md:text-[13px] text-gray-700 uppercase tracking-tight font-bold">S No</label>
+                <input
+                  type="text"
+                  value={sNoText}
+                  className="w-full px-3 py-1.5 border border-gray-200 bg-gray-50 text-gray-500 font-semibold rounded cursor-not-allowed text-xs h-[36px] outline-none text-center"
+                  readOnly
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-[11px] md:text-[13px] text-gray-700 uppercase tracking-tight font-bold">Plan Qty</label>
+                <input
+                  type="text"
+                  value={planQtyText}
+                  className="w-full px-3 py-1.5 border border-gray-200 bg-gray-50 text-gray-500 font-semibold rounded cursor-not-allowed text-xs h-[36px] outline-none text-center"
+                  readOnly
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-[11px] md:text-[13px] text-gray-700 uppercase tracking-tight font-bold">Total Plan Qty</label>
+                <input
+                  type="text"
+                  value={totalQty ? totalQty.toLocaleString('en-IN') : '0'}
+                  className="w-full px-3 py-1.5 border border-indigo-200 bg-indigo-50 text-indigo-700 font-black rounded cursor-not-allowed text-xs h-[36px] outline-none text-center"
+                  readOnly
+                />
+              </div>
+            </div>
+
+            {selectedOrder && (
+              <>
+                {/* BOM Table */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">BOM Components Required</h4>
+                    <button
+                      type="button"
+                      onClick={handleAddRow}
+                      className="flex items-center gap-1 px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded font-black text-[10px] uppercase transition active:scale-95 border border-indigo-200"
+                    >
+                      <Plus size={11} />
+                      <span>Add Extra Material</span>
+                    </button>
+                  </div>
+                  <div className="border border-indigo-50 rounded-lg overflow-hidden shadow-sm bg-white overflow-x-auto">
+                    <table className="w-full min-w-[700px] text-xs">
+                      <thead className="bg-slate-50 border-b border-indigo-50">
+                        <tr className="text-slate-600 font-semibold uppercase">
+                          <th className="px-4 py-2.5 text-center w-12">Select</th>
+                          <th className="px-4 py-2.5 text-center">Required BOM(Raw Material Name)</th>
+                          <th className="px-4 py-2.5 text-center">Raw Qty</th>
+                          <th className="px-4 py-2.5 text-center">Raw Cost</th>
+                          <th className="px-4 py-2.5 text-center">Available Raw Qty</th>
+                          <th className="px-4 py-2.5 text-center">Indent Qty</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-indigo-50">
+                        {editedTableData.length > 0 ? (
+                          editedTableData.map((row, index) => {
+                            const isShortage = row.indentQty > 0;
+                            return (
+                              <tr key={index} className={`transition-all duration-200 ${row.checked ? 'bg-emerald-50/20 text-slate-400 opacity-60' : 'hover:bg-slate-50/50'}`}>
+                                {/* Checkbox selector column in start */}
+                                <td className="px-4 py-2.5 text-center">
+                                  <input
+                                    type="checkbox"
+                                    checked={row.checked || false}
+                                    onChange={(e) => handleCellChange(index, 'checked', e.target.checked)}
+                                    className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer transition-transform active:scale-95"
+                                    title="Mark as Checked"
+                                  />
+                                </td>
+                                {/* Required BOM(Raw Material Name) */}
+                                <td className="px-4 py-2.5 text-center font-medium text-slate-900">
+                                  {row.isCustom ? (
+                                    <select
+                                      value={row.rawName}
+                                      onChange={(e) => handleSelectRawMaterial(index, e.target.value)}
+                                      className="w-full max-w-[200px] px-2 py-1 border border-gray-200 rounded text-center focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 text-xs font-semibold text-slate-800 bg-white inline-block"
+                                      required
+                                    >
+                                      <option value="">-- Select Material --</option>
+                                      {uniqueRawMaterials.map((m, mIdx) => (
+                                        <option key={mIdx} value={m.rawItemName}>{m.rawItemName}</option>
+                                      ))}
+                                    </select>
+                                  ) : (
+                                    `${row.rawName} (${row.itemCode})`
+                                  )}
+                                </td>
+                                {/* Raw Qty */}
+                                <td className="px-4 py-2.5 text-center">
+                                  <div className="flex items-center justify-center gap-1.5">
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="0.0001"
+                                      value={row.rawQty}
+                                      onChange={(e) => handleCellChange(index, 'rawQty', e.target.value)}
+                                      className="w-24 px-2 py-1 border border-gray-200 rounded text-center focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 text-xs font-bold text-indigo-600 bg-white"
+                                      required
+                                    />
+                                    <span className="text-gray-400 font-semibold">{row.unit}</span>
+                                  </div>
+                                </td>
+                                {/* Raw Cost */}
+                                <td className="px-4 py-2.5 text-center">
+                                  <div className="relative inline-block w-28">
+                                    <span className="absolute left-2 top-1 text-gray-400 font-semibold">₹</span>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      value={row.rawCost}
+                                      onChange={(e) => handleCellChange(index, 'rawCost', e.target.value)}
+                                      className="w-full pl-6 pr-2 py-1 border border-gray-200 rounded text-center focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 text-xs font-bold text-slate-700 bg-white"
+                                      required
+                                    />
+                                  </div>
+                                </td>
+                                {/* Available Raw Qty */}
+                                <td className="px-4 py-2.5 text-center">
+                                  <div className="flex items-center justify-center gap-1.5">
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="0.0001"
+                                      value={row.availableQty}
+                                      onChange={(e) => handleCellChange(index, 'availableQty', e.target.value)}
+                                      className="w-24 px-2 py-1 border border-gray-200 rounded text-center focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 text-xs text-slate-600 font-semibold bg-white"
+                                      required
+                                    />
+                                    <span className="text-gray-400 font-semibold">{row.unit}</span>
+                                  </div>
+                                </td>
+                                {/* Indent Qty */}
+                                <td className="px-4 py-2.5 text-center">
+                                  <span className={`px-2 py-0.5 rounded text-[10px] font-black ${isShortage ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'
+                                    }`}>
+                                    {row.indentQty > 0 ? `${row.indentQty} ${row.unit}` : 'Nil'}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        ) : (
+                          <tr>
+                            <td colSpan="6" className="px-4 py-6 text-center text-slate-400 font-medium bg-slate-50/30">
+                              No BOM components configured. Click "Add Extra Material" to add custom rows.
                             </td>
                           </tr>
-                        );
-                      })
-                    ) : (
-                      <tr>
-                        <td colSpan="6" className="px-4 py-6 text-center text-slate-400 font-medium bg-slate-50/30">
-                          No BOM components configured. Click "Add Extra Material" to add custom rows.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Costing Inputs & Calculations */}
-            <div className="space-y-4">
-              <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Costing & Financials</h4>
-              
-              {/* Inputs row */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                
-                {/* FG Available Qty Input */}
-                <div className="space-y-1">
-                  <label className="block text-[11px] md:text-[13px] text-gray-700 uppercase tracking-tight font-bold">FG Available Qty *</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={fgAvailableQty}
-                    onChange={(e) => setFgAvailableQty(e.target.value)}
-                    placeholder="Enter finished goods available qty"
-                    className="w-full px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500 text-xs h-[36px]"
-                    required
-                  />
-                  <span className="text-[10px] text-gray-400 block font-medium">Available finished stock quantity in godown.</span>
-                </div>
-
-                {/* Extra Amount Input */}
-                <div className="space-y-1">
-                  <label className="block text-[11px] md:text-[13px] text-gray-700 uppercase tracking-tight font-bold">Extra Amount *</label>
-                  <div className="relative">
-                    <span className="absolute left-2.5 top-[9px] text-gray-400 font-semibold text-xs">₹</span>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={extraAmount}
-                      onChange={(e) => {
-                        setExtraAmount(e.target.value);
-                        setIsExtraManuallyEdited(true);
-                      }}
-                      placeholder="Enter extra production cost"
-                      className="w-full pl-6 pr-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500 text-xs h-[36px]"
-                      required
-                    />
-                  </div>
-                  <span className="text-[10px] text-gray-400 block font-medium">Adds labor, processing, and handling overhead.</span>
-                </div>
-
-                {/* Selling Price Input */}
-                <div className="space-y-1">
-                  <label className="block text-[11px] md:text-[13px] text-gray-700 uppercase tracking-tight font-bold">Selling Price *</label>
-                  <div className="relative">
-                    <span className="absolute left-2.5 top-[9px] text-gray-400 font-semibold text-xs">₹</span>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={sellingPrice}
-                      onChange={(e) => setSellingPrice(e.target.value)}
-                      placeholder="Enter total selling price"
-                      className="w-full pl-6 pr-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500 text-xs h-[36px]"
-                      required
-                    />
-                  </div>
-                  <span className="text-[10px] text-gray-400 block font-medium">Total selling price for the planned quantity.</span>
-                </div>
-
-              </div>
-
-              {/* Calculations and SVG Row */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-indigo-50/30 rounded-xl p-4 border border-indigo-100/50">
-                
-                {/* Financial calculations */}
-                <div className="space-y-2 text-xs text-slate-700 font-semibold bg-white p-4 rounded-lg border border-slate-100 shadow-sm flex flex-col justify-center">
-                  <div className="flex justify-between border-b border-slate-50 pb-1.5">
-                    <span>Total Raw Required Qty:</span>
-                    <span className="text-indigo-600 font-bold">{Number(totals.totalRawRequiredQty).toFixed(3)}</span>
-                  </div>
-                  <div className="flex justify-between border-b border-slate-50 pb-1.5">
-                    <span>Total Raw Cost:</span>
-                    <span className="text-slate-900 font-bold">₹{totals.totalRawCost.toLocaleString('en-IN')}</span>
-                  </div>
-                  <div className="flex justify-between border-b border-slate-50 pb-1.5">
-                    <span>Total Production Cost:</span>
-                    <span className="text-indigo-600 font-bold">₹{totals.totalProductionCost.toLocaleString('en-IN')}</span>
-                  </div>
-                  <div className="flex justify-between border-b border-slate-50 pb-1.5">
-                    <span>Profit / Loss Amount:</span>
-                    <span className={`font-black ${totals.profitLoss >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                      ₹{totals.profitLoss.toLocaleString('en-IN')}
-                    </span>
-                  </div>
-                  <div className="flex justify-between pt-1.5">
-                    <span>Profit / Loss %:</span>
-                    <span className={`font-black ${totals.profitLoss >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                      {totals.profitLossPercent}%
-                    </span>
+                        )}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
 
-                {/* Dynamic Cost breakdown SVG preview */}
-                <div className="bg-white rounded-lg border border-slate-100 shadow-sm overflow-hidden flex items-center justify-center p-4">
-                  <img 
-                    src={generateCostingImage(totals)} 
-                    alt="Cost breakdown SVG preview" 
-                    className="w-full max-h-[80px]"
-                  />
-                </div>
+                {/* Costing Inputs & Calculations */}
+                <div className="space-y-4">
+                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Costing & Financials</h4>
 
-              </div>
-            </div>
+                  {/* Inputs row */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+                    {/* FG Available Qty Input */}
+                    <div className="space-y-1">
+                      <label className="block text-[11px] md:text-[13px] text-gray-700 uppercase tracking-tight font-bold">FG Available Qty *</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={fgAvailableQty}
+                        onChange={(e) => setFgAvailableQty(e.target.value)}
+                        placeholder="Enter finished goods available qty"
+                        className="w-full px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500 text-xs h-[36px]"
+                        required
+                      />
+                      <span className="text-[10px] text-gray-400 block font-medium">Available finished stock quantity in godown.</span>
+                    </div>
+
+                    {/* Extra Amount Input */}
+                    <div className="space-y-1">
+                      <label className="block text-[11px] md:text-[13px] text-gray-700 uppercase tracking-tight font-bold">Extra Amount *</label>
+                      <div className="relative">
+                        <span className="absolute left-2.5 top-[9px] text-gray-400 font-semibold text-xs">₹</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={extraAmount}
+                          onChange={(e) => {
+                            setExtraAmount(e.target.value);
+                            setIsExtraManuallyEdited(true);
+                          }}
+                          placeholder="Enter extra production cost"
+                          className="w-full pl-6 pr-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500 text-xs h-[36px]"
+                          required
+                        />
+                      </div>
+                      <span className="text-[10px] text-gray-400 block font-medium">Adds labor, processing, and handling overhead.</span>
+                    </div>
+
+                    {/* Selling Price Input */}
+                    <div className="space-y-1">
+                      <label className="block text-[11px] md:text-[13px] text-gray-700 uppercase tracking-tight font-bold">Selling Price *</label>
+                      <div className="relative">
+                        <span className="absolute left-2.5 top-[9px] text-gray-400 font-semibold text-xs">₹</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={sellingPrice}
+                          onChange={(e) => setSellingPrice(e.target.value)}
+                          placeholder="Enter total selling price"
+                          className="w-full pl-6 pr-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500 text-xs h-[36px]"
+                          required
+                        />
+                      </div>
+                      <span className="text-[10px] text-gray-400 block font-medium">Total selling price for the planned quantity.</span>
+                    </div>
+
+                  </div>
+
+                  {/* Calculations and SVG Row */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-indigo-50/30 rounded-xl p-4 border border-indigo-100/50">
+
+                    {/* Financial calculations */}
+                    <div className="space-y-2 text-xs text-slate-700 font-semibold bg-white p-4 rounded-lg border border-slate-100 shadow-sm flex flex-col justify-center">
+                      <div className="flex justify-between border-b border-slate-50 pb-1.5">
+                        <span>Total Raw Required Qty:</span>
+                        <span className="text-indigo-600 font-bold">{Number(totals.totalRawRequiredQty).toFixed(3)}</span>
+                      </div>
+                      <div className="flex justify-between border-b border-slate-50 pb-1.5">
+                        <span>Total Raw Cost:</span>
+                        <span className="text-slate-900 font-bold">₹{totals.totalRawCost.toLocaleString('en-IN')}</span>
+                      </div>
+                      <div className="flex justify-between border-b border-slate-50 pb-1.5">
+                        <span>Total Production Cost:</span>
+                        <span className="text-indigo-600 font-bold">₹{totals.totalProductionCost.toLocaleString('en-IN')}</span>
+                      </div>
+                      <div className="flex justify-between border-b border-slate-50 pb-1.5">
+                        <span>Profit / Loss Amount:</span>
+                        <span className={`font-black ${totals.profitLoss >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                          ₹{totals.profitLoss.toLocaleString('en-IN')}
+                        </span>
+                      </div>
+                      <div className="flex justify-between pt-1.5">
+                        <span>Profit / Loss %:</span>
+                        <span className={`font-black ${totals.profitLoss >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                          {totals.profitLossPercent}%
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Dynamic Cost breakdown SVG preview */}
+                    <div className="bg-white rounded-lg border border-slate-100 shadow-sm overflow-hidden flex items-center justify-center p-4">
+                      <img
+                        src={generateCostingImage(totals)}
+                        alt="Cost breakdown SVG preview"
+                        className="w-full max-h-[80px]"
+                      />
+                    </div>
+
+                  </div>
+                </div>
+              </>
+            )}
           </>
         )}
-
       </div>
     </ModalForm>
   );

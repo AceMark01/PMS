@@ -15,25 +15,10 @@ import Testing from './pages/Testing/Testing';
 
 import ProtectedRoute from './components/ProtectedRoute';
 import { initializeStorage } from './utils/storageManager';
-import { SEEDED_ITEMS, SEEDED_ORDERS } from './utils/seeds';
 
 function App() {
   useEffect(() => {
     initializeStorage();
-
-    // Force re-seed master items to the new list
-    const seedsVersion = 'v5';
-    if (localStorage.getItem('master_items_seeds_version') !== seedsVersion) {
-      localStorage.setItem('master_items', JSON.stringify(SEEDED_ITEMS));
-      localStorage.setItem('master_items_seeds_version', seedsVersion);
-    }
-
-    // Force re-seed production orders to the new list with multiple customize items
-    const ordersVersion = 'v2';
-    if (localStorage.getItem('production_orders_version') !== ordersVersion) {
-      localStorage.setItem('production_orders', JSON.stringify(SEEDED_ORDERS));
-      localStorage.setItem('production_orders_version', ordersVersion);
-    }
   }, []);
 
   return (

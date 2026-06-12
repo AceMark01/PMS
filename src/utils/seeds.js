@@ -83,7 +83,7 @@ export const SEEDED_ITEMS = [
   { code: 'A5M1761', name: 'A5 Note Book 176P 1 Line Mark', brand: 'Mark', category: 'Notebooks', price: 80 },
   { code: 'A5M1762', name: 'A5 Note Book 176P 2 Line Mark', brand: 'Mark', category: 'Notebooks', price: 80 },
   { code: 'A5M1763', name: 'A5 Note Book 176P 3 Line Mark', brand: 'Mark', category: 'Notebooks', price: 80 },
-  
+
   // Customize Order Products
   { code: 'C63N', name: 'Cobra File N-63 (999 National)', brand: 'National', category: 'Files', price: 120 },
   { code: 'MBR92', name: 'Milan Jumbo Register 92page', brand: 'Milan', category: 'Registers', price: 75 },
@@ -180,5 +180,5 @@ export const SEEDED_ORDERS = [
   { id: 'po-1217', sNo: 1217, timestamp: '01/06/2026 09:15:00', productCode: 'MBR180', productName: 'Milan Jumbo Register 180page', baseCat: 'CUSTOMIZE ORDER', qty: 350, godown: 'Main (AS)' },
   { id: 'po-1218', sNo: 1218, timestamp: '01/06/2026 09:20:00', productCode: 'MBR180', productName: 'Milan Jumbo Register 180page', baseCat: 'CUSTOMIZE ORDER', qty: 550, godown: 'Main (AS)' },
   { id: 'po-1219', sNo: 1219, timestamp: '02/06/2026 14:10:00', productCode: 'C63N', productName: 'Cobra File N-63 (999 National)', baseCat: 'CUSTOMIZE ORDER', qty: 150, godown: 'Main (AS)' },
-  { id: 'po-1220', sNo: 1220, timestamp: '02/06/2026 14:15:00', productCode: 'C63N', productName: 'Cobra File N-63 (999 National)', baseCat: 'CUSTOMIZE ORDER', qty: 250, godown: 'Main (AS)' }
+  { id: 'po-12202', sNo: 12202, timestamp: '02/06/2026 14:15:00', productCode: 'C63N', productName: 'Cobra File N-63 (999 National)', baseCat: 'CUSTOMIZE ORDER', qty: 250, godown: 'Main (AS)' }
 ];

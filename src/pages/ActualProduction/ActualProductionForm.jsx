@@ -2,25 +2,34 @@ import React, { useState, useEffect, useMemo } from 'react';
 import ModalForm from '../../components/ModalForm';
 import { Calendar, Tag, ShieldCheck, FileText, Plus, X } from 'lucide-react';
 
-export default function ActualProductionForm({ isOpen, onClose, onSubmitProduction, record }) {
+export default function ActualProductionForm({ isOpen, onClose, onSubmitProduction, record, bomRecords, inventoryRecords }) {
   const [dateOfProduction, setDateOfProduction] = useState('');
   const [editedRaws, setEditedRaws] = useState([]);
 
-  // Load unique raw materials list for dropdown options
+  // Load unique raw materials list for dropdown options from pre-fetched bom and inventory records
   const uniqueRawMaterials = useMemo(() => {
-    const saved = localStorage.getItem('raw_materials');
-    if (!saved) return [];
-    const items = JSON.parse(saved);
-    const unique = [];
-    const seen = new Set();
-    for (const rm of items) {
-      if (rm.rawItemName && !seen.has(rm.rawItemName)) {
-        seen.add(rm.rawItemName);
-        unique.push(rm.rawItemName);
-      }
+    const unique = new Set();
+    
+    // Add raw item names from BOM sheet
+    if (bomRecords && Array.isArray(bomRecords)) {
+      bomRecords.forEach(rm => {
+        if (rm.rawItemName && rm.rawItemName.trim()) {
+          unique.add(rm.rawItemName.trim());
+        }
+      });
     }
-    return unique.sort();
-  }, [isOpen]);
+    
+    // Add product names from Live IMS sheet
+    if (inventoryRecords && Array.isArray(inventoryRecords)) {
+      inventoryRecords.forEach(item => {
+        if (item.productName && item.productName.trim()) {
+          unique.add(item.productName.trim());
+        }
+      });
+    }
+    
+    return Array.from(unique).sort();
+  }, [bomRecords, inventoryRecords]);
 
   // Set default date to today in YYYY-MM-DD
   useEffect(() => {

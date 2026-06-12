@@ -5,40 +5,52 @@ import TestingPending from './TestingPending';
 import TestingApproval from './TestingApproval';
 import TestingForm from './TestingForm';
 import { TabSwitcher } from '../../components/StandardButtons';
+import { productionAPI } from '../../services/api';
 
 export default function Testing() {
   const [activeTab, setActiveTab] = useState('pending');
+  const [loading, setLoading] = useState(true);
 
-  // Load and manage actual production logs (read-only reference)
-  const [actualProductionHistory, setActualProductionHistory] = useState(() => {
-    const saved = localStorage.getItem('actual_production_history');
-    return saved ? JSON.parse(saved) : [];
-  });
+  // Load and manage actual production logs (fetched from sheet)
+  const [actualProductionHistory, setActualProductionHistory] = useState([]);
 
   // Load and manage testing approval history logs
-  const [testingHistory, setTestingHistory] = useState(() => {
-    const saved = localStorage.getItem('testing_history');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [testingHistory, setTestingHistory] = useState([]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
 
-  // Sync state with storage updates
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const [prodResult, testResult] = await Promise.all([
+        productionAPI.getActualProduction(),
+        productionAPI.getTestingHistory()
+      ]);
+
+      if (prodResult.success) {
+        setActualProductionHistory(prodResult.records || []);
+      } else {
+        toast.error(`Failed to load actual production logs: ${prodResult.error}`);
+      }
+
+      if (testResult.success) {
+        const records = testResult.records || [];
+        setTestingHistory(records);
+      } else {
+        toast.error(`Failed to load testing history: ${testResult.error}`);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to load data from spreadsheet');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const handleStorageChange = () => {
-      const savedProd = localStorage.getItem('actual_production_history');
-      if (savedProd) {
-        setActualProductionHistory(JSON.parse(savedProd));
-      }
-      const savedTesting = localStorage.getItem('testing_history');
-      if (savedTesting) {
-        setTestingHistory(JSON.parse(savedTesting));
-      }
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+    fetchData();
   }, []);
 
   // Filter actual production logs that are not yet tested
@@ -98,22 +110,60 @@ export default function Testing() {
     }
   };
 
-  const handleSubmitTesting = (productionRecordId, testingRecord) => {
-    const updatedHistory = [...testingHistory, testingRecord];
-    setTestingHistory(updatedHistory);
-    localStorage.setItem('testing_history', JSON.stringify(updatedHistory));
-    setIsFormOpen(false);
-    toast.success(`Quality testing successfully submitted: ${testingRecord.testingStatus}!`);
-  };
-
-  const handleDeleteHistory = (historyId) => {
-    if (window.confirm('Are you sure you want to delete this testing record? This will revert the record back to Pending Testing.')) {
-      const updatedHistory = testingHistory.filter(h => h.id !== historyId);
-      setTestingHistory(updatedHistory);
-      localStorage.setItem('testing_history', JSON.stringify(updatedHistory));
-      toast.success('Testing log deleted and job reverted back to pending testing.');
+  const handleSubmitTesting = async (productionRecordId, testingRecord) => {
+    setLoading(true);
+    try {
+      const result = await productionAPI.addTestingHistory(testingRecord);
+      if (result.success) {
+        toast.success(`Quality testing successfully submitted: ${testingRecord.testingStatus}!`);
+        setIsFormOpen(false);
+        await fetchData();
+      } else {
+        toast.error(`Failed to submit testing: ${result.error}`);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Error submitting testing decision');
+    } finally {
+      setLoading(false);
     }
   };
+
+  const handleDeleteHistory = async (historyId) => {
+    const record = testingHistory.find(h => h.id === historyId);
+    if (!record) {
+      toast.error('Testing record not found');
+      return;
+    }
+    if (window.confirm('Are you sure you want to delete this testing record? This will revert the record back to Pending Testing.')) {
+      setLoading(true);
+      try {
+        const result = await productionAPI.deleteTestingHistory(record.sNo);
+        if (result.success) {
+          toast.success('Testing log deleted and job reverted back to pending testing.');
+          await fetchData();
+        } else {
+          toast.error(`Failed to delete testing record: ${result.error}`);
+        }
+      } catch (err) {
+        console.error(err);
+        toast.error('Error deleting testing record');
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading actual production history...</p>
+        </div>
+      </div>
+    );
+  }
 
   const tabs = [
     { id: 'pending', label: 'Pending Testing', count: pendingTesting.length, icon: ClipboardCheck },
@@ -153,13 +203,13 @@ export default function Testing() {
       {/* Main Tab Views */}
       <div className="flex-1 min-h-0">
         {activeTab === 'pending' ? (
-          <TestingPending 
-            data={filteredPending} 
+          <TestingPending
+            data={filteredPending}
             onOpenTestingForm={handleOpenTestingForm}
           />
         ) : (
-          <TestingApproval 
-            data={filteredHistory} 
+          <TestingApproval
+            data={filteredHistory}
             onDeleteHistory={handleDeleteHistory}
           />
         )}

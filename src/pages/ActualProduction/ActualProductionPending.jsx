@@ -37,7 +37,7 @@ export default function ActualProductionPending({ data, onOpenProductionForm }) 
 
   const renderRow = (item, idx) => {
     const isProfit = item.profitLoss >= 0;
-    const isApproved = item.status === 'Approved';
+    const isApproved = item.status && item.status.trim().toLowerCase() === 'approved';
     return (
       <tr key={item.id || idx} className="hover:bg-indigo-50/30 transition-colors border-b border-gray-100">
         {/* Action: Open Production log form */}
@@ -150,7 +150,7 @@ export default function ActualProductionPending({ data, onOpenProductionForm }) 
           </div>
           <div>
             <span className="text-gray-400 block uppercase text-[8px] tracking-tight">Total Cost</span>
-            <span className="text-slate-900 font-bold">₹{item.totalProductionCost.toLocaleString('en-IN')}</span>
+            <span className="text-slate-900 font-bold">₹{(item.totalProductionCost || 0).toLocaleString('en-IN')}</span>
           </div>
         </div>
       </div>

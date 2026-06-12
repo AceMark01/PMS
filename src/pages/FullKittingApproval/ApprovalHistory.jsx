@@ -98,11 +98,10 @@ export default function ApprovalHistory({ data, onDeleteHistory }) {
         </td>
         {/* Status */}
         <td className="px-4 py-3 text-center text-xs whitespace-nowrap">
-          <span className={`px-2.5 py-1 rounded text-[10px] font-black uppercase tracking-wider ${
-            isApproved 
-              ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
-              : 'bg-rose-100 text-rose-800 border border-rose-200'
-          }`}>
+          <span className={`px-2.5 py-1 rounded text-[10px] font-black uppercase tracking-wider ${isApproved
+            ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+            : 'bg-rose-100 text-rose-800 border border-rose-200'
+            }`}>
             {item.status}
           </span>
         </td>
@@ -110,9 +109,9 @@ export default function ApprovalHistory({ data, onDeleteHistory }) {
         <td className="px-4 py-3 text-center min-w-[180px]">
           {item.costingImage ? (
             <div className="flex justify-center items-center">
-              <img 
-                src={item.costingImage} 
-                alt="Costing Chart" 
+              <img
+                src={item.costingImage}
+                alt="Costing Chart"
                 className="max-h-[48px] w-auto border border-slate-100 rounded bg-white shadow-xs p-0.5 object-contain"
               />
             </div>
@@ -136,9 +135,8 @@ export default function ApprovalHistory({ data, onDeleteHistory }) {
             <span className="text-xs font-bold text-gray-900 uppercase">{item.productName}</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase ${
-              isApproved ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
-            }`}>
+            <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase ${isApproved ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+              }`}>
               {item.status}
             </span>
             <button

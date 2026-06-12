@@ -5,47 +5,71 @@ import ActualProductionPending from './ActualProductionPending';
 import ActualProductionHistory from './ActualProductionHistory';
 import ActualProductionForm from './ActualProductionForm';
 import { TabSwitcher } from '../../components/StandardButtons';
+import { productionAPI } from '../../services/api';
 
 export default function ActualProduction() {
   const [activeTab, setActiveTab] = useState('pending');
 
-  // Load and manage kitting history (used to find Approved records)
-  const [kittingHistory, setKittingHistory] = useState(() => {
-    const saved = localStorage.getItem('kitting_history');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  // Load and manage actual production history logs
-  const [productionHistory, setProductionHistory] = useState(() => {
-    const saved = localStorage.getItem('actual_production_history');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [kittingHistory, setKittingHistory] = useState([]);
+  const [productionHistory, setProductionHistory] = useState([]);
+  const [bomRecords, setBomRecords] = useState([]);
+  const [inventoryRecords, setInventoryRecords] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
 
-  // Sync state with storage updates
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const [kittingResult, prodResult, bomResult, invResult] = await Promise.all([
+        productionAPI.getKittingApprovalHistory(),
+        productionAPI.getActualProduction(),
+        productionAPI.getBOM(),
+        productionAPI.getInventory()
+      ]);
+
+      if (kittingResult.success) {
+        setKittingHistory(kittingResult.records);
+      } else {
+        toast.error(`Failed to load approvals: ${kittingResult.error}`);
+      }
+
+      if (prodResult.success) {
+        setProductionHistory(prodResult.records);
+      } else {
+        toast.error(`Failed to load production logs: ${prodResult.error}`);
+      }
+
+      if (bomResult.success) {
+        setBomRecords(bomResult.records);
+      } else {
+        toast.error(`Failed to load BOM: ${bomResult.error}`);
+      }
+
+      if (invResult.success) {
+        setInventoryRecords(invResult.records);
+      } else {
+        toast.error(`Failed to load inventory: ${invResult.error}`);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to load data from spreadsheet');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const handleStorageChange = () => {
-      const savedKitting = localStorage.getItem('kitting_history');
-      if (savedKitting) {
-        setKittingHistory(JSON.parse(savedKitting));
-      }
-      const savedProd = localStorage.getItem('actual_production_history');
-      if (savedProd) {
-        setProductionHistory(JSON.parse(savedProd));
-      }
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+    fetchData();
   }, []);
 
   // Filter approved costing cards that are not yet in production history
   const pendingProduction = useMemo(() => {
-    const approvedKittings = kittingHistory.filter(h => h.status === 'Approved');
-    const producedIds = new Set(productionHistory.map(p => p.kittingRecordId));
-    return approvedKittings.filter(k => !producedIds.has(k.id));
+    const approvedKittings = kittingHistory.filter(h => h.status && h.status.trim().toLowerCase() === 'approved');
+    const producedIds = new Set(productionHistory.map(p => String(p.sNo).trim()));
+    return approvedKittings.filter(k => !producedIds.has(String(k.sNo).trim()));
   }, [kittingHistory, productionHistory]);
 
   // Filter pending items by search query
@@ -98,28 +122,61 @@ export default function ActualProduction() {
     }
   };
 
-  const handleSubmitProduction = (kittingRecordId, productionRecord) => {
-    // Inject the kittingRecordId for cross-referencing
-    const recordWithRef = {
-      ...productionRecord,
-      kittingRecordId
-    };
-
-    const updatedHistory = [...productionHistory, recordWithRef];
-    setProductionHistory(updatedHistory);
-    localStorage.setItem('actual_production_history', JSON.stringify(updatedHistory));
-    setIsFormOpen(false);
-    toast.success('Actual production log successfully submitted!');
-  };
-
-  const handleDeleteHistory = (historyId) => {
-    if (window.confirm('Are you sure you want to delete this production log? This will revert the record back to Pending Production.')) {
-      const updatedHistory = productionHistory.filter(h => h.id !== historyId);
-      setProductionHistory(updatedHistory);
-      localStorage.setItem('actual_production_history', JSON.stringify(updatedHistory));
-      toast.success('Production record removed and order reverted to pending production.');
+  const handleSubmitProduction = async (kittingRecordId, productionRecord) => {
+    setLoading(true);
+    try {
+      const result = await productionAPI.addActualProduction(productionRecord);
+      if (result.success) {
+        toast.success('Actual production log successfully submitted!');
+        setIsFormOpen(false);
+        await fetchData();
+      } else {
+        toast.error(`Failed to submit production: ${result.error}`);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Error submitting production log');
+    } finally {
+      setLoading(false);
     }
   };
+
+  const handleDeleteHistory = async (historyId) => {
+    const record = productionHistory.find(h => h.id === historyId);
+    if (!record) {
+      toast.error('Record not found');
+      return;
+    }
+
+    if (window.confirm('Are you sure you want to delete this production log? This will revert the record back to Pending Production.')) {
+      setLoading(true);
+      try {
+        const result = await productionAPI.deleteActualProduction(record.sNo);
+        if (result.success) {
+          toast.success('Production record removed and order reverted to pending production.');
+          await fetchData();
+        } else {
+          toast.error(`Failed to delete production: ${result.error}`);
+        }
+      } catch (err) {
+        console.error(err);
+        toast.error('Error deleting production log');
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading production pending orders...</p>
+        </div>
+      </div>
+    );
+  }
 
   const tabs = [
     { id: 'pending', label: 'Pending Production', count: pendingProduction.length, icon: ClipboardCheck },
@@ -159,13 +216,13 @@ export default function ActualProduction() {
       {/* Main Tab Views */}
       <div className="flex-1 min-h-0">
         {activeTab === 'pending' ? (
-          <ActualProductionPending 
-            data={filteredPending} 
+          <ActualProductionPending
+            data={filteredPending}
             onOpenProductionForm={handleOpenProductionForm}
           />
         ) : (
-          <ActualProductionHistory 
-            data={filteredHistory} 
+          <ActualProductionHistory
+            data={filteredHistory}
             onDeleteHistory={handleDeleteHistory}
           />
         )}
@@ -177,6 +234,8 @@ export default function ActualProduction() {
         onClose={() => setIsFormOpen(false)}
         onSubmitProduction={handleSubmitProduction}
         record={selectedRecord}
+        bomRecords={bomRecords}
+        inventoryRecords={inventoryRecords}
       />
     </div>
   );

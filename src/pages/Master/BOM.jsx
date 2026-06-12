@@ -4,114 +4,40 @@ import { Plus, Search, RotateCcw, Filter, Trash2, Edit2, Layers, Tag, Box, Dolla
 import DataTable from '../../components/DataTable';
 import ModalForm from '../../components/ModalForm';
 import SearchableDropdown from '../../components/SearchableDropdown';
-
 import { SEEDED_ITEMS } from '../../utils/seeds';
-
-export const SEEDED_RAWMATERIALS = [
-  { id: 'rm-001', productName: 'Dfc Register 372P Ace', fgCode: 'Dfc372', rawItemName: 'Cover DFC Register 50*76', itemCode: 'CDFC', unit: 'pcs', qty: 1, costPerUnit: 223, totalCost: 223, batchQty: 30, qtyFromRaw: 30 },
-  { id: 'rm-002', productName: 'Dfc Register 372P Ace', fgCode: 'Dfc372', rawItemName: 'MILL BOARD 65CM X 80CM 28 OUNCE', itemCode: '286580MB', unit: 'pcs', qty: 0.395, costPerUnit: 223, totalCost: 88.085, batchQty: 30, qtyFromRaw: 11.85 },
-  { id: 'rm-003', productName: 'Dfc Register 372P Ace', fgCode: 'Dfc372', rawItemName: 'Radiant Platinum 63Cm X 78Cm, 57Gsm 1 Line', itemCode: '637857RP1', unit: 'pcs', qty: 1.288, costPerUnit: 223, totalCost: 287.224, batchQty: 30, qtyFromRaw: 38.64 },
-  { id: 'rm-004', productName: 'Dfc Register 480P Ace', fgCode: 'Dfc480', rawItemName: 'Cover DFC Register 50*76', itemCode: 'CDFC', unit: 'pcs', qty: 1, costPerUnit: 223, totalCost: 223, batchQty: 30, qtyFromRaw: 30 },
-  { id: 'rm-005', productName: 'Dfc Register 480P Ace', fgCode: 'Dfc480', rawItemName: 'MILL BOARD 65CM X 80CM 28 OUNCE', itemCode: '286580MB', unit: 'pcs', qty: 0.395, costPerUnit: 223, totalCost: 88.085, batchQty: 30, qtyFromRaw: 11.85 },
-  { id: 'rm-006', productName: 'Dfc Register 480P Ace', fgCode: 'Dfc480', rawItemName: 'Radiant Platinum 63Cm X 78Cm, 57Gsm 1 Line', itemCode: '637857RP1', unit: 'pcs', qty: 1.288, costPerUnit: 223, totalCost: 287.224, batchQty: 30, qtyFromRaw: 38.64 },
-  { id: 'rm-007', productName: 'Dfc Register 576P Ace', fgCode: 'Dfc576', rawItemName: 'Cover DFC Register 50*76', itemCode: 'CDFC', unit: 'pcs', qty: 1, costPerUnit: 223, totalCost: 223, batchQty: 30, qtyFromRaw: 30 },
-  { id: 'rm-008', productName: 'Dfc Register 576P Ace', fgCode: 'Dfc576', rawItemName: 'MILL BOARD 65CM X 80CM 28 OUNCE', itemCode: '286580MB', unit: 'pcs', qty: 0.395, costPerUnit: 223, totalCost: 88.085, batchQty: 30, qtyFromRaw: 11.85 },
-  { id: 'rm-009', productName: 'Dfc Register 576P Ace', fgCode: 'Dfc576', rawItemName: 'Radiant Platinum 63Cm X 78Cm, 57Gsm 1 Line', itemCode: '637857RP1', unit: 'pcs', qty: 1.288, costPerUnit: 223, totalCost: 287.224, batchQty: 30, qtyFromRaw: 38.64 },
-  { id: 'rm-010', productName: '4 Flap File Special Cloth', fgCode: '4FSC', rawItemName: 'MILL BOARD 74CM X 86CM 24 OUNCE', itemCode: '247486MB', unit: 'pcs', qty: 0.118, costPerUnit: 0, totalCost: 0, batchQty: 192, qtyFromRaw: 22.656 },
-  { id: 'rm-011', productName: '4 Flap File Special Cloth', fgCode: '4FSC', rawItemName: 'MULTY LACE', itemCode: 'ML', unit: 'pcs', qty: 1, costPerUnit: 0, totalCost: 0, batchQty: 192, qtyFromRaw: 192 },
-  { id: 'rm-012', productName: '4 Flap File Special Cloth N-63', fgCode: '4FSC63', rawItemName: 'MILL BOARD 74CM X 86CM 24 OUNCE', itemCode: '247486MB', unit: 'pcs', qty: 0.118, costPerUnit: 0, totalCost: 0, batchQty: 192, qtyFromRaw: 22.656 },
-  { id: 'rm-013', productName: '4 Flap File Special Cloth N-63', fgCode: '4FSC63', rawItemName: 'MULTY LACE', itemCode: 'ML', unit: 'pcs', qty: 1, costPerUnit: 0, totalCost: 0, batchQty: 192, qtyFromRaw: 192 },
-  { id: 'rm-014', productName: 'Four Fold File 5 cm box', fgCode: '4FF5', rawItemName: 'MILL BOARD 74CM X 86CM 24 OUNCE', itemCode: '247486MB', unit: 'pcs', qty: 0.118, costPerUnit: 0, totalCost: 0, batchQty: 192, qtyFromRaw: 22.656 },
-  { id: 'rm-015', productName: 'Four Fold File 5 cm box', fgCode: '4FF5', rawItemName: 'MULTY LACE', itemCode: 'ML', unit: 'pcs', qty: 1, costPerUnit: 0, totalCost: 0, batchQty: 192, qtyFromRaw: 192 },
-  { id: 'rm-016', productName: 'Four Fold File 5 cm box', fgCode: '4FF5', rawItemName: 'x1510 Polyolefin Shring Film', itemCode: 'xPOF1510', unit: 'pcs', qty: 0.005208333333, costPerUnit: 0, totalCost: 0, batchQty: 192, qtyFromRaw: 1 },
-  { id: 'rm-017', productName: 'Four Fold File 7 cm box', fgCode: '4FF7', rawItemName: 'MILL BOARD 74CM X 86CM 24 OUNCE', itemCode: '247486MB', unit: 'pcs', qty: 0.118, costPerUnit: 0, totalCost: 0, batchQty: 192, qtyFromRaw: 22.656 },
-  { id: 'rm-018', productName: 'Four Fold File 7 cm box', fgCode: '4FF7', rawItemName: 'MULTY LACE', itemCode: 'ML', unit: 'pcs', qty: 1, costPerUnit: 0, totalCost: 0, batchQty: 192, qtyFromRaw: 192 },
-  { id: 'rm-019', productName: 'Four Fold File 7 cm box', fgCode: '4FF7', rawItemName: 'x1510 Polyolefin Shring Film', itemCode: 'xPOF1510', unit: 'pcs', qty: 0.005208333333, costPerUnit: 0, totalCost: 0, batchQty: 192, qtyFromRaw: 1 },
-  { id: 'rm-020', productName: '4 Flap File N-36', fgCode: '4f36', rawItemName: 'MILL BOARD 74CM X 86CM 24 OUNCE', itemCode: '247486MB', unit: 'pcs', qty: 0.118, costPerUnit: 0, totalCost: 0, batchQty: 192, qtyFromRaw: 22.656 },
-  { id: 'rm-021', productName: '4 Flap File N-36', fgCode: '4f36', rawItemName: 'MULTY LACE', itemCode: 'ML', unit: 'pcs', qty: 1, costPerUnit: 0, totalCost: 0, batchQty: 192, qtyFromRaw: 192 },
-  { id: 'rm-022', productName: 'A/4 Graph Copy 032P Ace', fgCode: 'A4g32', rawItemName: 'COVER A/4 GRAPH COPY', itemCode: 'CA4G0', unit: 'pcs', qty: 1, costPerUnit: 7168, totalCost: 7168, batchQty: 350, qtyFromRaw: 350 },
-  { id: 'rm-023', productName: 'A/4 Graph Copy 032P Ace', fgCode: 'A4g32', rawItemName: 'Radiant Platinum 55Cm X 90Cm, 54Gsm One Side', itemCode: '559054RPS', unit: 'pcs', qty: 0.0469, costPerUnit: 7168, totalCost: 336.1792, batchQty: 350, qtyFromRaw: 16.415 },
-  { id: 'rm-024', productName: 'A/4 Spiral Note Book 144P Mark', fgCode: 'A4MS144', rawItemName: 'COVER A/4 SPIRAL NOTE BOOK ACE 18', itemCode: 'CA4SA18', unit: 'pcs', qty: 1, costPerUnit: 0, totalCost: 0, batchQty: 100, qtyFromRaw: 100 },
-  { id: 'rm-025', productName: 'A/4 Spiral Note Book 144P Mark', fgCode: 'A4MS144', rawItemName: 'COVER A/4 SPIRAL NOTE BOOK BACK SIDE ACE 18', itemCode: 'CA4SBA18', unit: 'pcs', qty: 1, costPerUnit: 0, totalCost: 0, batchQty: 100, qtyFromRaw: 100 },
-  { id: 'rm-026', productName: 'A/4 Spiral Note Book 144P Mark', fgCode: 'A4MS144', rawItemName: 'Radiant Stationery 58Cm X 84Cm, 54Gsm 1 Line', itemCode: '588454RS1', unit: 'pcs', qty: 0.231, costPerUnit: 0, totalCost: 0, batchQty: 100, qtyFromRaw: 23.1 },
-  { id: 'rm-027', productName: 'A/4 Spiral Note Book 144P Mark', fgCode: 'A4MS144', rawItemName: 'WIRE 12 MM', itemCode: 'W 12', unit: 'pcs', qty: 0.0068, costPerUnit: 0, totalCost: 0, batchQty: 100, qtyFromRaw: 0.68 },
-  { id: 'rm-028', productName: '160P Plain Mark', fgCode: 'A5M160K', rawItemName: 'Radiant Stationery 91Cm X 68Cm 54Gsm 1 Line', itemCode: '916854RS1', unit: 'pcs', qty: 0.037575, costPerUnit: 0, totalCost: 0, batchQty: 480, qtyFromRaw: 18.036 },
-  { id: 'rm-029', productName: 'A5 Note Book 164P 1 Line Mark', fgCode: 'A5M1641', rawItemName: 'COVER A5 MARK 18', itemCode: 'A5MC18', unit: 'pcs', qty: 1, costPerUnit: 0, totalCost: 0, batchQty: 480, qtyFromRaw: 480 },
-  { id: 'rm-030', productName: 'A5 Note Book 164P 1 Line Mark', fgCode: 'A5M1641', rawItemName: 'Radiant Stationery 91Cm X 68Cm 54Gsm 1 Line', itemCode: '916854RS1', unit: 'pcs', qty: 0.037575, costPerUnit: 0, totalCost: 0, batchQty: 480, qtyFromRaw: 18.036 },
-  { id: 'rm-031', productName: 'A5 Note Book 172P 1 Line Natural Shed Mark', fgCode: 'A5M1721N', rawItemName: 'COVER A5 MARK 18', itemCode: 'A5MC18', unit: 'pcs', qty: 1, costPerUnit: 0, totalCost: 0, batchQty: 480, qtyFromRaw: 480 },
-  { id: 'rm-032', productName: 'A5 Note Book 172P 1 Line Natural Shed Mark', fgCode: 'A5M1721N', rawItemName: 'Radiant Stationery 91Cm X 68Cm 54Gsm 1 Line', itemCode: '916854RS1', unit: 'pcs', qty: 0.037575, costPerUnit: 0, totalCost: 0, batchQty: 480, qtyFromRaw: 18.036 },
-  { id: 'rm-033', productName: 'A5 Note Book 172P 4 Line Mark', fgCode: 'A5M1724', rawItemName: 'COVER A5 MARK 18', itemCode: 'A5MC18', unit: 'pcs', qty: 1, costPerUnit: 0, totalCost: 0, batchQty: 480, qtyFromRaw: 480 },
-  { id: 'rm-034', productName: 'A5 Note Book 172P 4 Line Mark', fgCode: 'A5M1724', rawItemName: 'Radiant Stationery 91Cm X 68Cm 54Gsm 1 Line', itemCode: '916854RS1', unit: 'pcs', qty: 0.037575, costPerUnit: 0, totalCost: 0, batchQty: 480, qtyFromRaw: 18.036 },
-  { id: 'rm-035', productName: 'A5 Note Book 172P Combind Mark', fgCode: 'A5M172C', rawItemName: 'COVER A5 MARK 18', itemCode: 'A5MC18', unit: 'pcs', qty: 1, costPerUnit: 0, totalCost: 0, batchQty: 480, qtyFromRaw: 480 },
-  { id: 'rm-036', productName: 'A5 Note Book 172P Combind Mark', fgCode: 'A5M172C', rawItemName: 'Radiant Stationery 91Cm X 68Cm 54Gsm 1 Line', itemCode: '916854RS1', unit: 'pcs', qty: 0.037575, costPerUnit: 0, totalCost: 0, batchQty: 480, qtyFromRaw: 18.036 },
-  { id: 'rm-037', productName: 'A5 Note Book 172P Dabba Mark', fgCode: 'A5M172D', rawItemName: 'COVER A5 MARK 18', itemCode: 'A5MC18', unit: 'pcs', qty: 1, costPerUnit: 0, totalCost: 0, batchQty: 480, qtyFromRaw: 480 },
-  { id: 'rm-038', productName: 'A5 Note Book 172P Dabba Mark', fgCode: 'A5M172D', rawItemName: 'Radiant Stationery 91Cm X 68Cm 54Gsm 1 Line', itemCode: '916854RS1', unit: 'pcs', qty: 0.037575, costPerUnit: 0, totalCost: 0, batchQty: 480, qtyFromRaw: 18.036 },
-  { id: 'rm-039', productName: 'A5 Note Book 172P Plain Mark', fgCode: 'A5M172K', rawItemName: 'COVER A5 MARK 18', itemCode: 'A5MC18', unit: 'pcs', qty: 1, costPerUnit: 0, totalCost: 0, batchQty: 480, qtyFromRaw: 480 },
-  { id: 'rm-040', productName: 'A5 Note Book 172P Plain Mark', fgCode: 'A5M172K', rawItemName: 'Radiant Stationery 91Cm X 68Cm 54Gsm 1 Line', itemCode: '916854RS1', unit: 'pcs', qty: 0.037575, costPerUnit: 0, totalCost: 0, batchQty: 480, qtyFromRaw: 18.036 },
-  { id: 'rm-041', productName: 'A5 Note Book 176P 1 Line Mark', fgCode: 'A5M1761', rawItemName: 'COVER A5 MARK 18', itemCode: 'A5MC18', unit: 'pcs', qty: 1, costPerUnit: 0, totalCost: 0, batchQty: 480, qtyFromRaw: 480 },
-  { id: 'rm-042', productName: 'A5 Note Book 176P 1 Line Mark', fgCode: 'A5M1761', rawItemName: 'Radiant Stationery 91Cm X 68Cm 54Gsm 1 Line', itemCode: '916854RS1', unit: 'pcs', qty: 0.037575, costPerUnit: 0, totalCost: 0, batchQty: 480, qtyFromRaw: 18.036 },
-  { id: 'rm-043', productName: 'A5 Note Book 176P 2 Line Mark', fgCode: 'A5M1762', rawItemName: 'COVER A5 MARK 18', itemCode: 'A5MC18', unit: 'pcs', qty: 1, costPerUnit: 0, totalCost: 0, batchQty: 480, qtyFromRaw: 480 },
-  { id: 'rm-044', productName: 'A5 Note Book 176P 2 Line Mark', fgCode: 'A5M1762', rawItemName: 'Radiant Stationery 91Cm X 68Cm 54Gsm 1 Line', itemCode: '916854RS1', unit: 'pcs', qty: 0.037575, costPerUnit: 0, totalCost: 0, batchQty: 480, qtyFromRaw: 18.036 },
-  { id: 'rm-045', productName: 'A5 Note Book 176P 3 Line Mark', fgCode: 'A5M1763', rawItemName: 'COVER A5 MARK 18', itemCode: 'A5MC18', unit: 'pcs', qty: 1, costPerUnit: 0, totalCost: 0, batchQty: 480, qtyFromRaw: 480 },
-  { id: 'rm-046', productName: 'A5 Note Book 176P 3 Line Mark', fgCode: 'A5M1763', rawItemName: 'Radiant Stationery 91Cm X 68Cm 54Gsm 1 Line', itemCode: '916854RS1', unit: 'pcs', qty: 0.037575, costPerUnit: 0, totalCost: 0, batchQty: 480, qtyFromRaw: 18.036 },
-  
-  // Customize Order Dummy Data for Kitting Flow
-  { id: 'rm-047', productName: 'Cobra File N-63 (999 National)', fgCode: 'C63N', rawItemName: 'Cobra Board N-63', itemCode: 'CBRD', unit: 'pcs', qty: 1.0, costPerUnit: 12.50, totalCost: 12.50, batchQty: 100, qtyFromRaw: 500 },
-  { id: 'rm-048', productName: 'Cobra File N-63 (999 National)', fgCode: 'C63N', rawItemName: 'Steel Clip Assembly', itemCode: 'SCLIP', unit: 'pcs', qty: 1.0, costPerUnit: 5.20, totalCost: 5.20, batchQty: 100, qtyFromRaw: 1000 },
-  { id: 'rm-049', productName: 'Cobra File N-63 (999 National)', fgCode: 'C63N', rawItemName: 'Paper Lining Sheet', itemCode: 'PLINE', unit: 'pcs', qty: 2.0, costPerUnit: 1.10, totalCost: 2.20, batchQty: 100, qtyFromRaw: 800 },
-  { id: 'rm-050', productName: 'Milan Jumbo Register 92page', fgCode: 'MBR92', rawItemName: 'Cover Milan Jumbo', itemCode: 'CMJ', unit: 'pcs', qty: 1.0, costPerUnit: 15.00, totalCost: 15.00, batchQty: 50, qtyFromRaw: 300 },
-  { id: 'rm-051', productName: 'Milan Jumbo Register 92page', fgCode: 'MBR92', rawItemName: 'Radiant Paper 54Gsm', itemCode: 'RP54', unit: 'pcs', qty: 0.35, costPerUnit: 120.00, totalCost: 42.00, batchQty: 50, qtyFromRaw: 100 },
-  { id: 'rm-052', productName: 'Milan Jumbo Register 92page', fgCode: 'MBR92', rawItemName: 'Binding Cloth', itemCode: 'BCLN', unit: 'pcs', qty: 0.05, costPerUnit: 45.00, totalCost: 2.25, batchQty: 50, qtyFromRaw: 50 },
-  { id: 'rm-053', productName: 'Jumbo Register N-2 112P Fineprint', fgCode: 'BR112', rawItemName: 'Fineprint Cover', itemCode: 'FPCV', unit: 'pcs', qty: 1.0, costPerUnit: 18.00, totalCost: 18.00, batchQty: 60, qtyFromRaw: 400 },
-  { id: 'rm-054', productName: 'Jumbo Register N-2 112P Fineprint', fgCode: 'BR112', rawItemName: 'Radiant Stationery Paper', itemCode: 'RSP', unit: 'pcs', qty: 0.45, costPerUnit: 130.00, totalCost: 58.50, batchQty: 60, qtyFromRaw: 150 },
-  { id: 'rm-055', productName: 'Milan Jumbo Register 180page', fgCode: 'MBR180', rawItemName: 'Cover Milan Jumbo Extra', itemCode: 'CMJE', unit: 'pcs', qty: 1.0, costPerUnit: 18.00, totalCost: 18.00, batchQty: 50, qtyFromRaw: 200 },
-  { id: 'rm-056', productName: 'Milan Jumbo Register 180page', fgCode: 'MBR180', rawItemName: 'Radiant Paper 54Gsm Extra', itemCode: 'RP54E', unit: 'pcs', qty: 0.70, costPerUnit: 120.00, totalCost: 84.00, batchQty: 50, qtyFromRaw: 150 },
-  { id: 'rm-057', productName: 'Milan Jumbo Register 276page', fgCode: 'MBR276', rawItemName: 'Cover Milan Jumbo Super', itemCode: 'CMJS', unit: 'pcs', qty: 1.0, costPerUnit: 22.00, totalCost: 22.00, batchQty: 50, qtyFromRaw: 150 },
-  { id: 'rm-058', productName: 'Milan Jumbo Register 276page', fgCode: 'MBR276', rawItemName: 'Radiant Paper 54Gsm Super', itemCode: 'RP54S', unit: 'pcs', qty: 1.10, costPerUnit: 120.00, totalCost: 132.00, batchQty: 50, qtyFromRaw: 200 },
-  
-  // Additional Customize Order Items for Pending List
-  { id: 'rm-059', productName: 'Milan Jumbo Register 372page', fgCode: 'MBR372', rawItemName: 'Cover Milan Jumbo Premium', itemCode: 'CMJP', unit: 'pcs', qty: 1.0, costPerUnit: 26.00, totalCost: 26.00, batchQty: 50, qtyFromRaw: 120 },
-  { id: 'rm-060', productName: 'Milan Jumbo Register 372page', fgCode: 'MBR372', rawItemName: 'Radiant Paper 54Gsm Premium', itemCode: 'RP54P', unit: 'pcs', qty: 1.50, costPerUnit: 120.00, totalCost: 180.00, batchQty: 50, qtyFromRaw: 80 },
-  { id: 'rm-061', productName: 'Milan Jumbo Register 476page', fgCode: 'MBR476', rawItemName: 'Cover Milan Jumbo Ultra', itemCode: 'CMJU', unit: 'pcs', qty: 1.0, costPerUnit: 32.00, totalCost: 32.00, batchQty: 40, qtyFromRaw: 100 },
-  { id: 'rm-062', productName: 'Milan Jumbo Register 476page', fgCode: 'MBR476', rawItemName: 'Radiant Paper 54Gsm Ultra', itemCode: 'RP54U', unit: 'pcs', qty: 1.90, costPerUnit: 120.00, totalCost: 228.00, batchQty: 40, qtyFromRaw: 90 },
-  { id: 'rm-063', productName: 'Jumbo Register N-3 168p Fineprint', fgCode: 'BR168', rawItemName: 'Fineprint Cover Medium', itemCode: 'FPCVM', unit: 'pcs', qty: 1.0, costPerUnit: 20.00, totalCost: 20.00, batchQty: 60, qtyFromRaw: 250 },
-  { id: 'rm-064', productName: 'Jumbo Register N-3 168p Fineprint', fgCode: 'BR168', rawItemName: 'Radiant Stationery Paper Medium', itemCode: 'RSPM', unit: 'pcs', qty: 0.68, costPerUnit: 130.00, totalCost: 88.40, batchQty: 60, qtyFromRaw: 180 },
-  { id: 'rm-065', productName: 'Jumbo Register N-4 224P Fineprint', fgCode: 'BR224', rawItemName: 'Fineprint Cover Large', itemCode: 'FPCVL', unit: 'pcs', qty: 1.0, costPerUnit: 23.00, totalCost: 23.00, batchQty: 60, qtyFromRaw: 200 },
-  { id: 'rm-066', productName: 'Jumbo Register N-4 224P Fineprint', fgCode: 'BR224', rawItemName: 'Radiant Stationery Paper Large', itemCode: 'RSPL', unit: 'pcs', qty: 0.90, costPerUnit: 130.00, totalCost: 117.00, batchQty: 60, qtyFromRaw: 140 },
-  { id: 'rm-067', productName: 'Jumbo Register N-5 280p Fineprint', fgCode: 'BR280', rawItemName: 'Fineprint Cover XL', itemCode: 'FPCVXL', unit: 'pcs', qty: 1.0, costPerUnit: 26.00, totalCost: 26.00, batchQty: 50, qtyFromRaw: 150 },
-  { id: 'rm-068', productName: 'Jumbo Register N-5 280p Fineprint', fgCode: 'BR280', rawItemName: 'Radiant Stationery Paper XL', itemCode: 'RSPXL', unit: 'pcs', qty: 1.12, costPerUnit: 130.00, totalCost: 145.60, batchQty: 50, qtyFromRaw: 120 },
-  { id: 'rm-069', productName: 'Jumbo Register N 6 336p Fineprint', fgCode: 'BR336', rawItemName: 'Fineprint Cover XXL', itemCode: 'FPCVXXL', unit: 'pcs', qty: 1.0, costPerUnit: 29.00, totalCost: 29.00, batchQty: 50, qtyFromRaw: 130 },
-  { id: 'rm-070', productName: 'Jumbo Register N 6 336p Fineprint', fgCode: 'BR336', rawItemName: 'Radiant Stationery Paper XXL', itemCode: 'RSPXXL', unit: 'pcs', qty: 1.35, costPerUnit: 130.00, totalCost: 175.50, batchQty: 50, qtyFromRaw: 100 },
-  { id: 'rm-071', productName: 'Jumbo Register N 8 448P Fineprint', fgCode: 'BR448', rawItemName: 'Fineprint Cover Super', itemCode: 'FPCVS', unit: 'pcs', qty: 1.0, costPerUnit: 35.00, totalCost: 35.00, batchQty: 40, qtyFromRaw: 110 },
-  { id: 'rm-072', productName: 'Jumbo Register N 8 448P Fineprint', fgCode: 'BR448', rawItemName: 'Radiant Stationery Paper Super', itemCode: 'RSPS', unit: 'pcs', qty: 1.80, costPerUnit: 130.00, totalCost: 234.00, batchQty: 40, qtyFromRaw: 90 }
-];
+import { productionAPI } from '../../services/api';
 
 export default function BOM() {
-  const [materials, setMaterials] = useState(() => {
-    const saved = localStorage.getItem('raw_materials');
-    if (saved) return JSON.parse(saved);
-    localStorage.setItem('raw_materials', JSON.stringify(SEEDED_RAWMATERIALS));
-    return SEEDED_RAWMATERIALS;
-  });
+  const [materials, setMaterials] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const masterItems = useMemo(() => {
-    const saved = localStorage.getItem('master_items');
-    return saved ? JSON.parse(saved) : SEEDED_ITEMS;
-  }, []);
+  const masterItems = SEEDED_ITEMS;
 
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [showFormModal, setShowFormModal] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [editingRowIndex, setEditingRowIndex] = useState(null);
+
+  const fetchBOM = async () => {
+    setLoading(true);
+    try {
+      const result = await productionAPI.getBOM();
+      if (result.success) {
+        setMaterials(result.records);
+      } else {
+        toast.error(`Failed to fetch BOM: ${result.error}`);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to load BOM from spreadsheet');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const seedVersion = 'v5';
-    const currentVersion = localStorage.getItem('raw_materials_version');
-    if (currentVersion !== seedVersion) {
-      localStorage.setItem('raw_materials', JSON.stringify(SEEDED_RAWMATERIALS));
-      localStorage.setItem('raw_materials_version', seedVersion);
-      setMaterials(SEEDED_RAWMATERIALS);
-    }
+    fetchBOM();
   }, []);
 
   // Form State
@@ -156,6 +82,7 @@ export default function BOM() {
   const handleAddClick = () => {
     setIsEditMode(false);
     setEditingId(null);
+    setEditingRowIndex(null);
     setSelectedProductName('');
     setSelectedFGCode('');
     setRawItems([
@@ -167,6 +94,7 @@ export default function BOM() {
   const handleEditClick = (item) => {
     setIsEditMode(true);
     setEditingId(item.id);
+    setEditingRowIndex(item.rowIndex);
     setSelectedProductName(item.productName);
     setSelectedFGCode(item.fgCode || '');
     setRawItems([
@@ -183,12 +111,21 @@ export default function BOM() {
     setShowFormModal(true);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (item) => {
     if (confirm('Are you sure you want to delete this raw material record?')) {
-      const updated = materials.filter(m => m.id !== id);
-      setMaterials(updated);
-      localStorage.setItem('raw_materials', JSON.stringify(updated));
-      toast.success('Record deleted successfully!');
+      const loadToast = toast.loading('Deleting BOM record from Google Sheets...');
+      try {
+        const result = await productionAPI.deleteBOM(item.rowIndex);
+        if (result.success) {
+          toast.success('Record deleted successfully!', { id: loadToast });
+          await fetchBOM();
+        } else {
+          toast.error(`Failed to delete record: ${result.error}`, { id: loadToast });
+        }
+      } catch (err) {
+        console.error(err);
+        toast.error('Failed to delete record.', { id: loadToast });
+      }
     }
   };
 
@@ -212,7 +149,7 @@ export default function BOM() {
     }));
   };
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
 
     if (!selectedProductName || !selectedFGCode) {
@@ -229,62 +166,61 @@ export default function BOM() {
       }
     }
 
-    if (isEditMode && editingId) {
-      // Edit mode: update single record
-      const row = rawItems[0];
-      const qtyVal = Number(row.qty);
-      const costVal = Number(row.costPerUnit);
-      const totalCostVal = qtyVal * costVal;
-
-      const updated = materials.map(m => {
-        if (m.id === editingId) {
-          return {
-            ...m,
-            productName: selectedProductName,
-            fgCode: selectedFGCode,
-            rawItemName: row.rawItemName,
-            itemCode: row.itemCode,
-            unit: row.unit,
-            qty: qtyVal,
-            costPerUnit: costVal,
-            totalCost: totalCostVal,
-            batchQty: Number(row.batchQty) || 0,
-            qtyFromRaw: Number(row.qtyFromRaw) || 0
-          };
-        }
-        return m;
-      });
-      setMaterials(updated);
-      localStorage.setItem('raw_materials', JSON.stringify(updated));
-      toast.success('Raw Material record updated!');
-    } else {
-      // Add mode: save multiple records
-      const newRecords = rawItems.map((row, idx) => {
-        const qtyVal = Number(row.qty);
-        const costVal = Number(row.costPerUnit);
-        const totalCostVal = qtyVal * costVal;
-        return {
-          id: `rm-${Date.now()}-${idx}-${Math.floor(Math.random() * 1000)}`,
+    const loadToast = toast.loading(isEditMode ? 'Updating BOM record...' : 'Saving BOM records...');
+    try {
+      if (isEditMode && editingRowIndex) {
+        // Edit mode: update single record
+        const row = rawItems[0];
+        const result = await productionAPI.updateBOM(editingRowIndex, {
           productName: selectedProductName,
           fgCode: selectedFGCode,
           rawItemName: row.rawItemName,
           itemCode: row.itemCode,
           unit: row.unit,
-          qty: qtyVal,
-          costPerUnit: costVal,
-          totalCost: totalCostVal,
+          qty: Number(row.qty),
+          costPerUnit: Number(row.costPerUnit),
           batchQty: Number(row.batchQty) || 0,
           qtyFromRaw: Number(row.qtyFromRaw) || 0
-        };
-      });
+        });
 
-      const updated = [...materials, ...newRecords];
-      setMaterials(updated);
-      localStorage.setItem('raw_materials', JSON.stringify(updated));
-      toast.success(`${newRecords.length} Raw Material record(s) added!`);
+        if (result.success) {
+          toast.success('BOM record updated successfully!', { id: loadToast });
+          setShowFormModal(false);
+          await fetchBOM();
+        } else {
+          toast.error(`Failed to update: ${result.error}`, { id: loadToast });
+        }
+      } else {
+        // Add mode: save multiple records
+        const promises = rawItems.map(row =>
+          productionAPI.addBOM({
+            productName: selectedProductName,
+            fgCode: selectedFGCode,
+            rawItemName: row.rawItemName,
+            itemCode: row.itemCode,
+            unit: row.unit,
+            qty: Number(row.qty),
+            costPerUnit: Number(row.costPerUnit),
+            batchQty: Number(row.batchQty) || 0,
+            qtyFromRaw: Number(row.qtyFromRaw) || 0
+          })
+        );
+
+        const results = await Promise.all(promises);
+        const failed = results.filter(r => !r.success);
+
+        if (failed.length === 0) {
+          toast.success(`${rawItems.length} BOM record(s) added successfully!`, { id: loadToast });
+          setShowFormModal(false);
+          await fetchBOM();
+        } else {
+          toast.error(`Failed to add some BOM records: ${failed[0].error}`, { id: loadToast });
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to save BOM.', { id: loadToast });
     }
-
-    setShowFormModal(false);
   };
 
   // Compile options lists for filters
@@ -321,6 +257,17 @@ export default function BOM() {
     currentPage * itemsPerPage
   );
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading Bill of Materials...</p>
+        </div>
+      </div>
+    );
+  }
+
   const tableHeaders = [
     "Action", "Product Name", "FG Code", "Raw Item Name", "Item Code", "Unit", "Quantity (J/I)", "Cost Per Unit", "Total Cost", "Batch Qty", "Qty(From Raw Material)"
   ];
@@ -338,7 +285,7 @@ export default function BOM() {
               <Edit2 size={14} />
             </button>
             <button
-              onClick={() => handleDelete(item.id)}
+              onClick={() => handleDelete(item)}
               className="p-1 text-red-600 hover:bg-red-50 hover:text-red-700 rounded transition active:scale-95"
               title="Delete Record"
             >
@@ -369,7 +316,7 @@ export default function BOM() {
           </div>
           <div className="flex gap-2">
             <button onClick={() => handleEditClick(item)} className="p-1 text-indigo-600 hover:bg-indigo-50 rounded" title="Edit"><Edit2 size={13} /></button>
-            <button onClick={() => handleDelete(item.id)} className="p-1 text-red-600 hover:bg-red-50 rounded" title="Delete"><Trash2 size={13} /></button>
+            <button onClick={() => handleDelete(item)} className="p-1 text-red-600 hover:bg-red-50 rounded" title="Delete"><Trash2 size={13} /></button>
           </div>
         </div>
 
@@ -413,11 +360,11 @@ export default function BOM() {
 
   return (
     <div className="p-0 sm:p-2 md:p-6 space-y-2 md:space-y-6 flex flex-col h-full min-h-0">
-      
+
       {/* Header Filters & Add Button */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-2 lg:gap-4 w-full px-2 sm:px-0">
         <div className="flex flex-col lg:flex-row w-full gap-2 lg:gap-3 items-center">
-          
+
           {/* Search bar */}
           <div className="flex items-center gap-2 w-full lg:w-auto lg:flex-[1.5]">
             <div className="flex-1 w-full relative">
@@ -431,33 +378,33 @@ export default function BOM() {
               />
             </div>
             <button
-               onClick={() => setShowMobileFilters(!showMobileFilters)}
-               className={`lg:hidden flex items-center justify-center rounded-lg shadow-sm h-[32px] w-[32px] flex-shrink-0 transition ${showMobileFilters ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'}`}
-               title="Toggle Filters"
-             >
-               <Filter size={14} />
-             </button>
-             {!showMobileFilters && (
-               <button
-                 onClick={handleAddClick}
-                 className="lg:hidden flex items-center justify-center bg-indigo-600 text-white rounded-lg h-[32px] w-[32px] flex-shrink-0 shadow-sm active:scale-95"
-                 title="Add Record"
-               >
-                 <Plus size={16} />
-               </button>
-             )}
-             <button
-               onClick={handleClearFilters}
-               className="lg:hidden flex items-center justify-center bg-gray-50 text-gray-500 border border-gray-200 rounded-lg h-[32px] w-[32px] flex-shrink-0 shadow-sm active:scale-95"
-               title="Clear Filters"
-             >
-               <RotateCcw size={14} />
-             </button>
+              onClick={() => setShowMobileFilters(!showMobileFilters)}
+              className={`lg:hidden flex items-center justify-center rounded-lg shadow-sm h-[32px] w-[32px] flex-shrink-0 transition ${showMobileFilters ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'}`}
+              title="Toggle Filters"
+            >
+              <Filter size={14} />
+            </button>
+            {!showMobileFilters && (
+              <button
+                onClick={handleAddClick}
+                className="lg:hidden flex items-center justify-center bg-indigo-600 text-white rounded-lg h-[32px] w-[32px] flex-shrink-0 shadow-sm active:scale-95"
+                title="Add Record"
+              >
+                <Plus size={16} />
+              </button>
+            )}
+            <button
+              onClick={handleClearFilters}
+              className="lg:hidden flex items-center justify-center bg-gray-50 text-gray-500 border border-gray-200 rounded-lg h-[32px] w-[32px] flex-shrink-0 shadow-sm active:scale-95"
+              title="Clear Filters"
+            >
+              <RotateCcw size={14} />
+            </button>
           </div>
 
           {/* Filters Dropdown Group */}
           <div className={`${showMobileFilters ? 'flex' : 'hidden'} lg:flex flex-col lg:flex-row lg:flex-nowrap gap-2 w-full lg:w-auto lg:flex-[6] overflow-visible`}>
-            
+
             {/* Products Dropdown */}
             <div className="flex-1 min-w-0 lg:min-w-[150px]">
               <SearchableDropdown
@@ -534,7 +481,7 @@ export default function BOM() {
         maxWidth="max-w-4xl"
       >
         <div className="space-y-4">
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Product Name Search */}
             <div className="space-y-1">

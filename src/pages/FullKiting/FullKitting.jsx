@@ -5,25 +5,13 @@ import KittingPending from './KittingPending';
 import KittingHistory from './KittingHistory';
 import FullKittingForm from './FullKittingForm';
 import SearchableDropdown from '../../components/SearchableDropdown';
-import { SEEDED_ORDERS } from '../../utils/seeds';
 import { TabSwitcher } from '../../components/StandardButtons';
+import { productionAPI } from '../../services/api';
 
 export default function FullKitting() {
   const [activeTab, setActiveTab] = useState('pending');
-  
-  // Load and manage production orders
-  const [orders, setOrders] = useState(() => {
-    const saved = localStorage.getItem('production_orders');
-    if (saved) return JSON.parse(saved);
-    localStorage.setItem('production_orders', JSON.stringify(SEEDED_ORDERS));
-    return SEEDED_ORDERS;
-  });
-
-  // Load and manage kitting history
-  const [kittingHistory, setKittingHistory] = useState(() => {
-    const saved = localStorage.getItem('kitting_history');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   // Filter Toolbar States
   const [searchQuery, setSearchQuery] = useState('');
@@ -33,27 +21,53 @@ export default function FullKitting() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState('');
 
-  // Keep state updated in case localStorage updates from other pages
+  const fetchOrders = async () => {
+    setLoading(true);
+    try {
+      const result = await productionAPI.getProductionOrders();
+      if (result.success) {
+        const transformedOrders = result.orders.map(order => ({
+          id: order.sNo?.toString() || `po-${order.sNo}`,
+          sNo: order.sNo,
+          timestamp: order.timestamp,
+          productCode: order.productCode || '',
+          productName: order.productName || '',
+          baseCat: order.baseCat || '',
+          qty: Number(order.qty) || 0,
+          godown: order.godown || '',
+          rawNames: order.rawNames || '',
+          rawQuantities: order.rawQuantities || '',
+          fgAvailableQty: Number(order.fgAvailableQty) || 0,
+          totalRawRequiredQty: Number(order.totalRawRequiredQty) || 0,
+          totalRawCost: Number(order.totalRawCost) || 0,
+          extraAmount: Number(order.extraAmount) || 0,
+          totalProductionCost: Number(order.totalProductionCost) || 0,
+          sellingPrice: Number(order.sellingPrice) || 0,
+          profitLoss: Number(order.profitLoss) || 0,
+          profitLossPercent: Number(order.profitLossPercent) || 0,
+          costingImage: order.costingImage || '',
+          checkJc: order.checkJc || ''
+        }));
+        setOrders(transformedOrders);
+      } else {
+        toast.error(`Failed to load orders: ${result.error}`);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to connect to spreadsheet');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const handleStorageChange = () => {
-      const savedOrders = localStorage.getItem('production_orders');
-      if (savedOrders) {
-        setOrders(JSON.parse(savedOrders));
-      }
-      const savedHistory = localStorage.getItem('kitting_history');
-      if (savedHistory) {
-        setKittingHistory(JSON.parse(savedHistory));
-      }
-    };
-    
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+    fetchOrders();
   }, []);
 
-  // Filter orders to only display those with 'CUSTOMIZE ORDER' which are not yet processed ('Kitted')
+  // Filter orders to only display those with 'CUSTOMIZE ORDER' which are not yet processed
   const pendingOrders = useMemo(() => {
     return orders.filter(
-      order => order.baseCat === 'CUSTOMIZE ORDER' && order.status !== 'Kitted'
+      order => order.baseCat === 'CUSTOMIZE ORDER' && !order.rawNames
     );
   }, [orders]);
 
@@ -79,6 +93,34 @@ export default function FullKitting() {
       return true;
     });
   }, [pendingOrders, godown, searchQuery]);
+
+  // Compile kitting history records from sheet orders that have costing card details
+  const kittingHistory = useMemo(() => {
+    return orders
+      .filter(o => o.baseCat === 'CUSTOMIZE ORDER' && o.rawNames)
+      .map(o => ({
+        id: `kh-${o.sNo}`,
+        sNo: o.sNo,
+        timestamp: o.timestamp,
+        productCode: o.productCode,
+        productName: o.productName,
+        baseCat: o.baseCat,
+        qty: o.qty,
+        rawNames: o.rawNames,
+        rawQuantities: o.rawQuantities,
+        fgAvailableQty: o.fgAvailableQty,
+        totalRawRequiredQty: o.totalRawRequiredQty,
+        totalRawCost: o.totalRawCost,
+        extraAmount: o.extraAmount,
+        totalProductionCost: o.totalProductionCost,
+        sellingPrice: o.sellingPrice,
+        profitLoss: o.profitLoss,
+        profitLossPercent: o.profitLossPercent,
+        costingImage: o.costingImage,
+        status: o.checkJc || 'Pending',
+        jobCardNo: o.checkJc?.startsWith('JC-') ? o.checkJc : ''
+      }));
+  }, [orders]);
 
   // Apply search/filtering for history records
   const filteredHistory = useMemo(() => {
@@ -113,54 +155,58 @@ export default function FullKitting() {
     setIsFormOpen(true);
   };
 
-  const handleSaveKittingRecord = (orderId, historyRecord) => {
-    const orderIds = Array.isArray(orderId) ? orderId : [orderId];
-    const idsSet = new Set(orderIds);
+  const handleSaveKittingRecord = async (orderId, historyRecord) => {
+    const sNos = Array.isArray(orderId) ? orderId : [orderId];
 
-    // 1. Update order status to 'Kitted' in production_orders
-    const updatedOrders = orders.map(o => {
-      if (idsSet.has(o.id)) {
-        return { ...o, status: 'Kitted' };
+    const loadToast = toast.loading('Saving costing check to Google Sheets...');
+    try {
+      const result = await productionAPI.updateKittingData(sNos, {
+        rawNames: historyRecord.rawNames,
+        rawQuantities: historyRecord.rawQuantities,
+        fgAvailableQty: historyRecord.fgAvailableQty,
+        totalRawRequiredQty: historyRecord.totalRawRequiredQty,
+        totalRawCost: historyRecord.totalRawCost,
+        extraAmount: historyRecord.extraAmount,
+        totalProductionCost: historyRecord.totalProductionCost,
+        sellingPrice: historyRecord.sellingPrice,
+        profitLoss: historyRecord.profitLoss,
+        profitLossPercent: historyRecord.profitLossPercent,
+        costingImage: historyRecord.costingImage
+      });
+
+      if (result.success) {
+        toast.success('Costing card saved successfully!', { id: loadToast });
+        setIsFormOpen(false);
+        await fetchOrders();
+      } else {
+        toast.error(`Failed to save costing card: ${result.error}`, { id: loadToast });
       }
-      return o;
-    });
-    setOrders(updatedOrders);
-    localStorage.setItem('production_orders', JSON.stringify(updatedOrders));
-
-    // 2. Add costing card record to kitting history
-    const updatedHistory = [...kittingHistory, historyRecord];
-    setKittingHistory(updatedHistory);
-    localStorage.setItem('kitting_history', JSON.stringify(updatedHistory));
-
-    setIsFormOpen(false);
-    toast.success('Costing card saved to kitting history!');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to save costing card to sheet.', { id: loadToast });
+    }
   };
 
-  const handleDeleteHistory = (historyId) => {
+  const handleDeleteHistory = async (historyId) => {
     if (window.confirm('Are you sure you want to delete this costing record? This will revert the production order back to Pending.')) {
       const record = kittingHistory.find(h => h.id === historyId);
-      let updatedOrders = [...orders];
-      
-      if (record) {
-        const sNos = String(record.sNo).split(',').map(s => Number(s.trim())).filter(Boolean);
-        const sNosSet = new Set(sNos);
+      if (!record) return;
 
-        // Find orders matching by sNo in the list or productCode + timestamp
-        updatedOrders = orders.map(o => {
-          if (sNosSet.has(Number(o.sNo)) || (o.productCode === record.productCode && o.timestamp === record.timestamp)) {
-            const { status, ...rest } = o; // strip status
-            return rest;
-          }
-          return o;
-        });
-        setOrders(updatedOrders);
-        localStorage.setItem('production_orders', JSON.stringify(updatedOrders));
+      const sNos = String(record.sNo).split(',').map(s => Number(s.trim())).filter(Boolean);
+
+      const loadToast = toast.loading('Reverting costing card from Google Sheets...');
+      try {
+        const result = await productionAPI.clearKittingData(sNos);
+        if (result.success) {
+          toast.success('Record reverted to pending successfully!', { id: loadToast });
+          await fetchOrders();
+        } else {
+          toast.error(`Failed to revert record: ${result.error}`, { id: loadToast });
+        }
+      } catch (err) {
+        console.error(err);
+        toast.error('Failed to revert costing card.', { id: loadToast });
       }
-
-      const updatedHistory = kittingHistory.filter(h => h.id !== historyId);
-      setKittingHistory(updatedHistory);
-      localStorage.setItem('kitting_history', JSON.stringify(updatedHistory));
-      toast.success('Record removed and order reverted to pending.');
     }
   };
 
@@ -168,6 +214,17 @@ export default function FullKitting() {
     { id: 'pending', label: 'Pending Kitting', count: pendingOrders.length, icon: ClipboardList },
     { id: 'history', label: 'Kitting History', count: kittingHistory.length, icon: History }
   ];
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading kitting orders...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 sm:p-6 md:p-8 space-y-6 flex flex-col h-full min-h-0 bg-slate-50/30">

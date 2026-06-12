@@ -18,30 +18,27 @@ export default function ActualProductionHistory({ data, onDeleteHistory }) {
     "JC-Job Card",
     "S NO",
     "ProductCode",
-    "ProductName",
+    "Product Name",
     "Order Quantity",
-    "Date Of Production",
-    "Approval Status",
-    "Approval Remarks",
     "Raw Name1",
-    "Raw Name2",
-    "Raw Name3",
-    "Raw Name4",
-    "Raw Name5",
-    "Raw Name6",
-    "Raw Name7",
-    "Raw Name8",
-    "Raw Name9",
-    "Raw Name10",
     "Raw Qty1",
+    "Raw Name2",
     "Raw Qty2",
+    "Raw Name3",
     "Raw Qty3",
+    "Raw Name4",
     "Raw Qty4",
+    "Raw Name5",
     "Raw Qty5",
+    "Raw Name6",
     "Raw Qty6",
+    "Raw Name7",
     "Raw Qty7",
+    "Raw Name8",
     "Raw Qty8",
+    "Raw Name9",
     "Raw Qty9",
+    "Raw Name10",
     "Raw Qty10"
   ];
 
@@ -70,43 +67,31 @@ export default function ActualProductionHistory({ data, onDeleteHistory }) {
         <td className="px-4 py-3 text-center text-xs text-gray-600 font-semibold">{item.sNo}</td>
         {/* ProductCode */}
         <td className="px-4 py-3 text-center text-xs text-indigo-600 font-bold">{item.productCode}</td>
-        {/* ProductName */}
+        {/* Product Name */}
         <td className="px-4 py-3 text-center text-xs font-semibold text-gray-900 uppercase min-w-[200px] break-words whitespace-normal">{item.productName}</td>
         {/* Order Quantity */}
         <td className="px-4 py-3 text-center text-xs text-slate-800 font-semibold">{item.qty} pcs</td>
-        {/* Date Of Production */}
-        <td className="px-4 py-3 text-center text-xs text-slate-700 font-bold whitespace-nowrap">{item.dateOfProduction}</td>
-        {/* Approval Status */}
-        <td className="px-4 py-3 text-center text-xs whitespace-nowrap">
-          <span className="px-2.5 py-1 rounded bg-emerald-100 text-emerald-800 border border-emerald-200 text-[10px] font-black uppercase tracking-wider">
-            {item.approvalStatus}
-          </span>
-        </td>
-        {/* Approval Remarks */}
-        <td className="px-4 py-3 text-center text-xs text-gray-500 min-w-[150px] whitespace-normal break-words">{item.approvalRemarks || '-'}</td>
-        
-        {/* Raw Names 1-10 */}
+
+        {/* Interleaved Raw Name & Qty */}
         <td className="px-4 py-3 text-center text-[11px] text-slate-600 whitespace-nowrap">{item.rawName1}</td>
-        <td className="px-4 py-3 text-center text-[11px] text-slate-600 whitespace-nowrap">{item.rawName2}</td>
-        <td className="px-4 py-3 text-center text-[11px] text-slate-600 whitespace-nowrap">{item.rawName3}</td>
-        <td className="px-4 py-3 text-center text-[11px] text-slate-600 whitespace-nowrap">{item.rawName4}</td>
-        <td className="px-4 py-3 text-center text-[11px] text-slate-600 whitespace-nowrap">{item.rawName5}</td>
-        <td className="px-4 py-3 text-center text-[11px] text-slate-600 whitespace-nowrap">{item.rawName6}</td>
-        <td className="px-4 py-3 text-center text-[11px] text-slate-600 whitespace-nowrap">{item.rawName7}</td>
-        <td className="px-4 py-3 text-center text-[11px] text-slate-600 whitespace-nowrap">{item.rawName8}</td>
-        <td className="px-4 py-3 text-center text-[11px] text-slate-600 whitespace-nowrap">{item.rawName9}</td>
-        <td className="px-4 py-3 text-center text-[11px] text-slate-600 whitespace-nowrap">{item.rawName10}</td>
-        
-        {/* Raw Qtys 1-10 */}
         <td className="px-4 py-3 text-center text-[11px] text-indigo-600 font-bold whitespace-nowrap">{item.rawQty1}</td>
+        <td className="px-4 py-3 text-center text-[11px] text-slate-600 whitespace-nowrap">{item.rawName2}</td>
         <td className="px-4 py-3 text-center text-[11px] text-indigo-600 font-bold whitespace-nowrap">{item.rawQty2}</td>
+        <td className="px-4 py-3 text-center text-[11px] text-slate-600 whitespace-nowrap">{item.rawName3}</td>
         <td className="px-4 py-3 text-center text-[11px] text-indigo-600 font-bold whitespace-nowrap">{item.rawQty3}</td>
+        <td className="px-4 py-3 text-center text-[11px] text-slate-600 whitespace-nowrap">{item.rawName4}</td>
         <td className="px-4 py-3 text-center text-[11px] text-indigo-600 font-bold whitespace-nowrap">{item.rawQty4}</td>
+        <td className="px-4 py-3 text-center text-[11px] text-slate-600 whitespace-nowrap">{item.rawName5}</td>
         <td className="px-4 py-3 text-center text-[11px] text-indigo-600 font-bold whitespace-nowrap">{item.rawQty5}</td>
+        <td className="px-4 py-3 text-center text-[11px] text-slate-600 whitespace-nowrap">{item.rawName6}</td>
         <td className="px-4 py-3 text-center text-[11px] text-indigo-600 font-bold whitespace-nowrap">{item.rawQty6}</td>
+        <td className="px-4 py-3 text-center text-[11px] text-slate-600 whitespace-nowrap">{item.rawName7}</td>
         <td className="px-4 py-3 text-center text-[11px] text-indigo-600 font-bold whitespace-nowrap">{item.rawQty7}</td>
+        <td className="px-4 py-3 text-center text-[11px] text-slate-600 whitespace-nowrap">{item.rawName8}</td>
         <td className="px-4 py-3 text-center text-[11px] text-indigo-600 font-bold whitespace-nowrap">{item.rawQty8}</td>
+        <td className="px-4 py-3 text-center text-[11px] text-slate-600 whitespace-nowrap">{item.rawName9}</td>
         <td className="px-4 py-3 text-center text-[11px] text-indigo-600 font-bold whitespace-nowrap">{item.rawQty9}</td>
+        <td className="px-4 py-3 text-center text-[11px] text-slate-600 whitespace-nowrap">{item.rawName10}</td>
         <td className="px-4 py-3 text-center text-[11px] text-indigo-600 font-bold whitespace-nowrap">{item.rawQty10}</td>
       </tr>
     );
@@ -137,8 +122,8 @@ export default function ActualProductionHistory({ data, onDeleteHistory }) {
             <span className="text-slate-800 font-extrabold">{item.jobCardNo}</span>
           </div>
           <div>
-            <span className="text-gray-400 block uppercase text-[8px] tracking-tight font-black">Date of Prod.</span>
-            <span className="text-slate-900 font-bold">{item.dateOfProduction}</span>
+            <span className="text-gray-400 block uppercase text-[8px] tracking-tight font-black">Timestamp</span>
+            <span className="text-slate-900 font-bold">{item.timestamp}</span>
           </div>
         </div>
       </div>

@@ -1,41 +1,20 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import toast from 'react-hot-toast';
-import { Search, Plus, RotateCcw, Filter, Trash2, Calendar, ClipboardCheck } from 'lucide-react';
+import { Search, Plus, RotateCcw, Filter, Trash2 } from 'lucide-react';
 import DataTable from '../../components/DataTable';
 import SearchableDropdown from '../../components/SearchableDropdown';
 import AddOrder from './AddOrder';
-
-import { SEEDED_ITEMS, SEEDED_ORDERS } from '../../utils/seeds';
-
-
+import { productionAPI } from '../../services/api';
 
 export default function OrderDetails() {
-  const [orders, setOrders] = useState(() => {
-    const saved = localStorage.getItem('production_orders');
-    if (saved) return JSON.parse(saved);
-    localStorage.setItem('production_orders', JSON.stringify(SEEDED_ORDERS));
-    return SEEDED_ORDERS;
-  });
-
-  useEffect(() => {
-    const seedVersion = 'v2';
-    const currentVersion = localStorage.getItem('production_orders_version');
-    if (currentVersion !== seedVersion) {
-      localStorage.setItem('production_orders', JSON.stringify(SEEDED_ORDERS));
-      localStorage.setItem('production_orders_version', seedVersion);
-      setOrders(SEEDED_ORDERS);
-    }
-  }, []);
-
-  const masterItems = useMemo(() => {
-    const saved = localStorage.getItem('master_items');
-    if (saved) return JSON.parse(saved);
-    localStorage.setItem('master_items', JSON.stringify(SEEDED_ITEMS));
-    return SEEDED_ITEMS;
-  }, []);
-
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [masterItems, setMasterItems] = useState([]);
+  const [loadingMasterItems, setLoadingMasterItems] = useState(true);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState(null);
 
   // Filters State
   const [filters, setFilters] = useState({
@@ -47,6 +26,100 @@ export default function OrderDetails() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
 
+  // Fetch orders from Google Sheet API on component mount
+  useEffect(() => {
+    fetchOrders();
+    fetchMasterItems();
+  }, []);
+
+  const fetchOrders = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const result = await productionAPI.getProductionOrders();
+
+      if (result.success) {
+        // Transform the data to match your frontend structure
+        const transformedOrders = result.orders.map(order => ({
+          id: order.sNo?.toString() || `po-${order.sNo}`,
+          sNo: order.sNo,
+          timestamp: order.timestamp,
+          productCode: order.productCode || '',
+          productName: order.productName || '',
+          baseCat: order.baseCat || '',
+          qty: order.qty || '',
+          godown: order.godown || ''
+        }));
+
+        setOrders(transformedOrders);
+      } else {
+        setError(result.error || 'Failed to load orders');
+        toast.error(`Failed to load orders: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+      setError('Failed to connect to server. Please check your connection.');
+      toast.error('Failed to connect to server. Please try again later.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchMasterItems = async () => {
+    setLoadingMasterItems(true);
+
+    try {
+      // If you have a dedicated endpoint for master items, use it
+      // Otherwise, extract unique items from orders or keep using seeds
+      // For now, we'll fetch master items from the API if available
+      // You can add a getMasterItems function to your productionAPI
+
+      // Fallback: Extract unique product info from orders once loaded
+      // But since orders load async, we'll initially use empty array
+      // and update when orders are loaded
+      setMasterItems([]);
+
+      // If you have a separate API endpoint for master items:
+      // const result = await productionAPI.getMasterItems();
+      // if (result.success) {
+      //   setMasterItems(result.items);
+      // }
+    } catch (error) {
+      console.error('Error fetching master items:', error);
+    } finally {
+      setLoadingMasterItems(false);
+    }
+  };
+
+  // Update master items when orders are loaded (extract unique product info)
+  useEffect(() => {
+    if (orders.length > 0) {
+      // Extract unique product combinations from orders
+      const uniqueProducts = new Map();
+
+      orders.forEach(order => {
+        const key = `${order.productCode}|${order.productName}`;
+        if (!uniqueProducts.has(key) && order.productCode && order.productName) {
+          uniqueProducts.set(key, {
+            code: order.productCode,
+            name: order.productName,
+            baseCat: order.baseCat
+          });
+        }
+      });
+
+      const items = Array.from(uniqueProducts.values()).map(item => ({
+        id: item.code,
+        code: item.code,
+        name: item.name,
+        category: item.baseCat
+      }));
+
+      setMasterItems(items);
+    }
+  }, [orders]);
+
   const handleClearFilters = () => {
     setFilters({
       searchQuery: '',
@@ -57,38 +130,74 @@ export default function OrderDetails() {
     toast.success('Filters cleared');
   };
 
-  const handleCreateOrder = (newOrder) => {
-    const formatTimestamp = () => {
-      const now = new Date();
-      const pad = (n) => String(n).padStart(2, '0');
-      return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-    };
+  const handleCreateOrder = async (newOrder) => {
+    setIsSubmitting(true);
 
-    const nextSNo = orders.length > 0 ? Math.max(...orders.map(o => Number(o.sNo) || 0)) + 1 : 1;
-    const orderRecord = {
-      id: `po-${nextSNo}`,
-      sNo: nextSNo,
-      timestamp: formatTimestamp(),
-      ...newOrder
-    };
+    try {
+      const formatTimestamp = () => {
+        const now = new Date();
+        const pad = (n) => String(n).padStart(2, '0');
+        return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+      };
 
-    const updated = [...orders, orderRecord];
-    setOrders(updated);
-    localStorage.setItem('production_orders', JSON.stringify(updated));
-    setShowAddModal(false);
-    toast.success('Production Order created successfully!');
-  };
+      const orderData = {
+        timestamp: formatTimestamp(),
+        sNo: null, // Let backend auto-generate
+        productCode: newOrder.productCode,
+        productName: newOrder.productName,
+        baseCat: newOrder.baseCat,
+        qty: parseFloat(newOrder.qty),
+        godown: newOrder.godown
+      };
 
-  const handleDeleteOrder = (id) => {
-    if (confirm('Are you sure you want to cancel/delete this production order?')) {
-      const updated = orders.filter(o => o.id !== id);
-      setOrders(updated);
-      localStorage.setItem('production_orders', JSON.stringify(updated));
-      toast.success('Production Order cancelled/deleted.');
+      const result = await productionAPI.addProductionOrder(orderData);
+
+      if (result.success) {
+        toast.success('Production Order created successfully!');
+        setShowAddModal(false);
+
+        // Refresh orders list from API
+        await fetchOrders();
+      } else {
+        toast.error(`Failed to create order: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error creating order:', error);
+      toast.error('Failed to create production order');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  // Compile active categories and godowns for filters
+  const handleDeleteOrder = async (id) => {
+    if (!confirm('Are you sure you want to cancel/delete this production order?')) {
+      return;
+    }
+
+    try {
+      // Find the order to get its S NO
+      const orderToDelete = orders.find(o => o.id === id);
+      if (!orderToDelete) {
+        toast.error('Order not found');
+        return;
+      }
+
+      const result = await productionAPI.deleteProductionOrder(orderToDelete.sNo);
+
+      if (result.success) {
+        toast.success('Production Order cancelled/deleted.');
+        // Refresh orders list from API
+        await fetchOrders();
+      } else {
+        toast.error(`Failed to delete order: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error deleting order:', error);
+      toast.error('Failed to delete production order');
+    }
+  };
+
+  // Compile active categories and godowns for filters from API data
   const categoriesList = useMemo(() => {
     return Array.from(new Set(orders.map(o => o.baseCat))).filter(Boolean).sort();
   }, [orders]);
@@ -106,10 +215,10 @@ export default function OrderDetails() {
       if (filters.searchQuery) {
         const q = filters.searchQuery.toLowerCase();
         return (
-          order.productCode.toLowerCase().includes(q) ||
-          order.productName.toLowerCase().includes(q) ||
-          order.baseCat.toLowerCase().includes(q) ||
-          order.godown.toLowerCase().includes(q)
+          (order.productCode && order.productCode.toLowerCase().includes(q)) ||
+          (order.productName && order.productName.toLowerCase().includes(q)) ||
+          (order.baseCat && order.baseCat.toLowerCase().includes(q)) ||
+          (order.godown && order.godown.toLowerCase().includes(q))
         );
       }
       return true;
@@ -127,7 +236,6 @@ export default function OrderDetails() {
   ];
 
   const renderRow = (item, idx) => {
-    const globalIdx = (currentPage - 1) * itemsPerPage + idx + 1;
     return (
       <tr key={item.id || idx} className="hover:bg-indigo-50/30 transition-colors border-b border-gray-100">
         <td className="px-4 py-3 text-center whitespace-nowrap text-xs">
@@ -151,7 +259,6 @@ export default function OrderDetails() {
   };
 
   const renderCard = (item, idx) => {
-    const globalIdx = (currentPage - 1) * itemsPerPage + idx + 1;
     return (
       <div key={item.id || idx} className="bg-white rounded-xl border border-indigo-50 shadow-sm p-4 space-y-3 transition-all hover:shadow-md hover:border-indigo-100">
         <div className="flex justify-between items-center pb-2 border-b border-slate-50">
@@ -196,13 +303,44 @@ export default function OrderDetails() {
     );
   };
 
+  // Loading state
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading production orders...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error && orders.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full min-h-[400px]">
+        <div className="text-center max-w-md">
+          <div className="text-red-600 text-6xl mb-4">⚠️</div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Failed to Load Data</h3>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button
+            onClick={fetchOrders}
+            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-0 sm:p-2 md:p-6 space-y-2 md:space-y-6 flex flex-col h-full min-h-0">
-      
+
       {/* Header Filters & Add Button */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-2 lg:gap-4 w-full px-2 sm:px-0">
         <div className="flex flex-col lg:flex-row w-full gap-2 lg:gap-3 items-center">
-          
+
           {/* Search bar */}
           <div className="flex items-center gap-2 w-full lg:w-auto lg:flex-[1.5]">
             <div className="flex-1 w-full relative">
@@ -216,33 +354,33 @@ export default function OrderDetails() {
               />
             </div>
             <button
-               onClick={() => setShowMobileFilters(!showMobileFilters)}
-               className={`lg:hidden flex items-center justify-center rounded-lg shadow-sm h-[32px] w-[32px] flex-shrink-0 transition ${showMobileFilters ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'}`}
-               title="Toggle Filters"
-             >
-               <Filter size={14} />
-             </button>
-             {!showMobileFilters && (
-               <button
-                 onClick={() => setShowAddModal(true)}
-                 className="lg:hidden flex items-center justify-center bg-indigo-600 text-white rounded-lg h-[32px] w-[32px] flex-shrink-0 shadow-sm active:scale-95"
-                 title="Add Order"
-               >
-                 <Plus size={16} />
-               </button>
-             )}
-             <button
-               onClick={handleClearFilters}
-               className="lg:hidden flex items-center justify-center bg-gray-50 text-gray-500 border border-gray-200 rounded-lg h-[32px] w-[32px] flex-shrink-0 shadow-sm active:scale-95"
-               title="Clear Filters"
-             >
-               <RotateCcw size={14} />
-             </button>
+              onClick={() => setShowMobileFilters(!showMobileFilters)}
+              className={`lg:hidden flex items-center justify-center rounded-lg shadow-sm h-[32px] w-[32px] flex-shrink-0 transition ${showMobileFilters ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'}`}
+              title="Toggle Filters"
+            >
+              <Filter size={14} />
+            </button>
+            {!showMobileFilters && (
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="lg:hidden flex items-center justify-center bg-indigo-600 text-white rounded-lg h-[32px] w-[32px] flex-shrink-0 shadow-sm active:scale-95"
+                title="Add Order"
+              >
+                <Plus size={16} />
+              </button>
+            )}
+            <button
+              onClick={handleClearFilters}
+              className="lg:hidden flex items-center justify-center bg-gray-50 text-gray-500 border border-gray-200 rounded-lg h-[32px] w-[32px] flex-shrink-0 shadow-sm active:scale-95"
+              title="Clear Filters"
+            >
+              <RotateCcw size={14} />
+            </button>
           </div>
 
           {/* Filters Dropdown Group */}
           <div className={`${showMobileFilters ? 'flex' : 'hidden'} lg:flex flex-col lg:flex-row lg:flex-nowrap gap-2 w-full lg:w-auto lg:flex-[6] overflow-visible`}>
-            
+
             {/* Base Cat (Category) Dropdown */}
             <div className="flex-1 min-w-0 lg:min-w-[150px]">
               <SearchableDropdown
@@ -283,11 +421,19 @@ export default function OrderDetails() {
         {/* Desktop Add Button */}
         <button
           onClick={() => setShowAddModal(true)}
-          className="hidden lg:flex bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg items-center justify-center transition shadow-sm w-[38px] h-[38px] flex-shrink-0"
+          disabled={isSubmitting}
+          className="hidden lg:flex bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg items-center justify-center transition shadow-sm w-[38px] h-[38px] flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
           title="Create Production Order"
         >
           <Plus size={18} />
         </button>
+      </div>
+
+      {/* Stats Bar */}
+      <div className="px-2 sm:px-0">
+        <div className="text-sm text-gray-600">
+          Showing {filteredOrders.length} of {orders.length} production orders
+        </div>
       </div>
 
       {/* Table Container */}
@@ -314,6 +460,7 @@ export default function OrderDetails() {
         onClose={() => setShowAddModal(false)}
         onSave={handleCreateOrder}
         masterItems={masterItems}
+        isSubmitting={isSubmitting}
       />
 
     </div>

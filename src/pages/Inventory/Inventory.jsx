@@ -6,27 +6,11 @@ import SearchableDropdown from '../../components/SearchableDropdown';
 import ModalForm from '../../components/ModalForm';
 
 import { SEEDED_ITEMS } from '../../utils/seeds';
+import { productionAPI } from '../../services/api';
 
 export default function Inventory() {
-  const [inventory, setInventory] = useState(() => {
-    const saved = localStorage.getItem('inventory_status');
-    if (saved) return JSON.parse(saved);
-
-    // Seed from master items if empty
-    const masterSaved = localStorage.getItem('master_items');
-    const masterItems = masterSaved ? JSON.parse(masterSaved) : SEEDED_ITEMS;
-
-    const initialInventory = masterItems.map((item, idx) => ({
-      productCode: item.code,
-      productName: item.name,
-      maxLevel: 500 + (idx % 5) * 100, // Seed values
-      prodGroup: item.category,
-      closingStock: 100 + (idx % 7) * 45
-    }));
-
-    localStorage.setItem('inventory_status', JSON.stringify(initialInventory));
-    return initialInventory;
-  });
+  const [inventory, setInventory] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
@@ -38,32 +22,50 @@ export default function Inventory() {
     closingStock: ''
   });
 
-  // Keep inventory in sync with master items if items are added
-  useEffect(() => {
-    const masterSaved = localStorage.getItem('master_items');
-    const masterItems = masterSaved ? JSON.parse(masterSaved) : SEEDED_ITEMS;
-    
-    let updated = [...inventory];
-    let changed = false;
+  const fetchInventory = async () => {
+    setLoading(true);
+    try {
+      const result = await productionAPI.getInventory();
+      if (result.success) {
+        let fetchedData = result.records;
 
-    masterItems.forEach(item => {
-      const exists = updated.some(inv => inv.productCode === item.code);
-      if (!exists) {
-        updated.push({
-          productCode: item.code,
-          productName: item.name,
-          maxLevel: 500,
-          prodGroup: item.category,
-          closingStock: 0
+        // Sync with master items
+        const masterItems = SEEDED_ITEMS;
+
+        let updated = [...fetchedData];
+        let changed = false;
+
+        masterItems.forEach(item => {
+          const exists = updated.some(inv => inv.productCode === item.code);
+          if (!exists) {
+            const newItem = {
+              productCode: item.code,
+              productName: item.name,
+              maxLevel: 500,
+              prodGroup: item.category,
+              closingStock: 0
+            };
+            updated.push(newItem);
+            changed = true;
+            // Auto sync to sheet
+            productionAPI.updateInventory(newItem).catch(err => console.error('Error auto-syncing item:', err));
+          }
         });
-        changed = true;
-      }
-    });
 
-    if (changed) {
-      setInventory(updated);
-      localStorage.setItem('inventory_status', JSON.stringify(updated));
+        setInventory(updated);
+      } else {
+        toast.error(`Failed to fetch inventory: ${result.error}`);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to load inventory from spreadsheet');
+    } finally {
+      setLoading(false);
     }
+  };
+
+  useEffect(() => {
+    fetchInventory();
   }, []);
 
   // Filters State
@@ -97,24 +99,34 @@ export default function Inventory() {
     setShowEditModal(true);
   };
 
-  const handleSaveEdit = (e) => {
+  const handleSaveEdit = async (e) => {
     e.preventDefault();
 
-    const updated = inventory.map(item => {
-      if (item.productCode === editForm.productCode) {
-        return {
-          ...item,
-          maxLevel: Number(editForm.maxLevel),
-          closingStock: Number(editForm.closingStock)
-        };
-      }
-      return item;
-    });
+    const loadToast = toast.loading('Updating inventory in Google Sheets...');
+    try {
+      const itemToUpdate = inventory.find(item => item.productCode === editForm.productCode);
+      const prodGroup = itemToUpdate ? itemToUpdate.prodGroup : '';
 
-    setInventory(updated);
-    localStorage.setItem('inventory_status', JSON.stringify(updated));
-    setShowEditModal(false);
-    toast.success('Inventory record updated successfully!');
+      const inventoryData = {
+        productCode: editForm.productCode,
+        productName: editForm.productName,
+        maxLevel: Number(editForm.maxLevel),
+        prodGroup: prodGroup,
+        closingStock: Number(editForm.closingStock)
+      };
+
+      const result = await productionAPI.updateInventory(inventoryData);
+      if (result.success) {
+        toast.success('Inventory record updated successfully!', { id: loadToast });
+        setShowEditModal(false);
+        await fetchInventory();
+      } else {
+        toast.error(`Failed to update: ${result.error}`, { id: loadToast });
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to save inventory.', { id: loadToast });
+    }
   };
 
   // Compile groups list for filters
@@ -171,9 +183,8 @@ export default function Inventory() {
         <td className="px-4 py-3 text-center text-xs text-slate-700 font-bold whitespace-nowrap">{item.maxLevel}</td>
         <td className="px-4 py-3 text-center text-[11px] text-gray-600 whitespace-nowrap">{item.prodGroup}</td>
         <td className="px-4 py-3 text-center whitespace-nowrap text-xs">
-          <span className={`px-2.5 py-0.5 rounded text-[11px] font-black ${
-            isLowStock ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'
-          }`}>
+          <span className={`px-2.5 py-0.5 rounded text-[11px] font-black ${isLowStock ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'
+            }`}>
             {item.closingStock}
           </span>
         </td>
@@ -213,9 +224,8 @@ export default function Inventory() {
           </div>
           <div>
             <span className="text-gray-400 block uppercase text-[8px] tracking-tight">Closing Stock</span>
-            <span className={`px-1.5 py-0.5 rounded text-[9px] font-black inline-block ${
-              isLowStock ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'
-            }`}>
+            <span className={`px-1.5 py-0.5 rounded text-[9px] font-black inline-block ${isLowStock ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'
+              }`}>
               {item.closingStock}
             </span>
           </div>
@@ -224,13 +234,24 @@ export default function Inventory() {
     );
   };
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading Inventory...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-0 sm:p-2 md:p-6 space-y-2 md:space-y-6 flex flex-col h-full min-h-0">
-      
+
       {/* Header Filters */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-2 lg:gap-4 w-full px-2 sm:px-0">
         <div className="flex flex-col lg:flex-row w-full gap-2 lg:gap-3 items-center">
-          
+
           {/* Search bar */}
           <div className="flex items-center gap-2 w-full lg:w-auto lg:flex-[1.5]">
             <div className="flex-1 w-full relative">
@@ -244,24 +265,24 @@ export default function Inventory() {
               />
             </div>
             <button
-               onClick={() => setShowMobileFilters(!showMobileFilters)}
-               className={`lg:hidden flex items-center justify-center rounded-lg shadow-sm h-[32px] w-[32px] flex-shrink-0 transition ${showMobileFilters ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'}`}
-               title="Toggle Filters"
-             >
-               <Filter size={14} />
-             </button>
-             <button
-               onClick={handleClearFilters}
-               className="lg:hidden flex items-center justify-center bg-gray-50 text-gray-500 border border-gray-200 rounded-lg h-[32px] w-[32px] flex-shrink-0 shadow-sm active:scale-95"
-               title="Clear Filters"
-             >
-               <RotateCcw size={14} />
-             </button>
+              onClick={() => setShowMobileFilters(!showMobileFilters)}
+              className={`lg:hidden flex items-center justify-center rounded-lg shadow-sm h-[32px] w-[32px] flex-shrink-0 transition ${showMobileFilters ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'}`}
+              title="Toggle Filters"
+            >
+              <Filter size={14} />
+            </button>
+            <button
+              onClick={handleClearFilters}
+              className="lg:hidden flex items-center justify-center bg-gray-50 text-gray-500 border border-gray-200 rounded-lg h-[32px] w-[32px] flex-shrink-0 shadow-sm active:scale-95"
+              title="Clear Filters"
+            >
+              <RotateCcw size={14} />
+            </button>
           </div>
 
           {/* Filters Dropdown Group */}
           <div className={`${showMobileFilters ? 'flex' : 'hidden'} lg:flex flex-col lg:flex-row lg:flex-nowrap gap-2 w-full lg:w-auto lg:flex-[6] overflow-visible`}>
-            
+
             {/* Prod Group Dropdown */}
             <div className="flex-1 min-w-0 lg:min-w-[150px]">
               <SearchableDropdown
