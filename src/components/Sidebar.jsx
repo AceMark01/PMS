@@ -166,7 +166,16 @@ const Sidebar = ({ isOpen, onClose }) => {
           </nav>
 
           {/* User Profile Section */}
-          <div className="p-4 border-t border-indigo-100 bg-indigo-50/50">
+          <div className="p-4 border-t border-indigo-100 bg-indigo-50/50 flex flex-col gap-3">
+            <div className="flex items-center gap-3 px-1">
+              <div className="w-10 h-10 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-lg shadow-inner uppercase flex-shrink-0">
+                {user?.name ? user.name.charAt(0) : user?.id?.charAt(0) || 'U'}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-gray-900 truncate uppercase">{user?.name || user?.id || 'User'}</p>
+                <p className="text-[10px] text-gray-500 font-semibold tracking-wider uppercase">{user?.role || 'USER'}</p>
+              </div>
+            </div>
             <button
               onClick={handleLogout}
               className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-lg bg-red-50 text-red-600 border border-red-200 hover:bg-red-500 hover:text-white transition-all font-semibold shadow-sm"

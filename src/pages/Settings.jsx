@@ -1,12 +1,17 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import toast from 'react-hot-toast';
-import { Trash2, Edit2, Search, User, Key, Shield, Check, X, RotateCcw, Plus } from 'lucide-react';
-import { getUsers, saveUsers } from '../utils/storageManager';
+import { Trash2, Edit2, Search, User, Key, Shield, Check, X, RotateCcw, Plus, ShieldAlert } from 'lucide-react';
 import DataTable from '../components/DataTable';
 import ModalForm from '../components/ModalForm';
+import { productionAPI } from '../services/api';
+import { useAuthStore } from '../store/authStore';
 
 export default function Settings() {
-  const [users, setUsers] = useState(getUsers());
+  const { user: currentUser } = useAuthStore();
+  const isAdmin = currentUser?.role === 'ADMIN';
+
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddUserModal, setShowAddUserModal] = useState(false);
 
@@ -25,35 +30,92 @@ export default function Settings() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(15);
 
+  const fetchUsers = async () => {
+    if (!isAdmin) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    try {
+      const result = await productionAPI.getSheetData('Login', { headerRow: 1 });
+      if (result.success) {
+        const mappedUsers = (result.records || []).map(r => ({
+          id: (r.username || r.userName || r.__rowValues?.[1] || '').toString().trim(),
+          name: (r['full-Name'] || r['Full-Name'] || r.fullName || r.fullname || r.__rowValues?.[0] || '').toString().trim(),
+          password: (r.password || r.__rowValues?.[2] || '').toString().trim(),
+          role: (r.role || r.__rowValues?.[3] || 'USER').toString().trim(),
+          rowIndex: r.rowIndex
+        }));
+        setUsers(mappedUsers);
+      } else {
+        toast.error(`Failed to fetch users: ${result.error}`);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to load users');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
   const handleEditUser = (user) => {
     setEditingUserId(user.id);
     setEditingUser({ ...user });
   };
 
-  const handleSaveUser = () => {
+  const handleSaveUser = async () => {
     if (!editingUser.name.trim() || !editingUser.password.trim()) {
       toast.error('Please fill all required fields');
       return;
     }
 
-    const updatedUsers = users.map(u => u.id === editingUserId ? editingUser : u);
-    setUsers(updatedUsers);
-    saveUsers(updatedUsers);
-    setEditingUserId(null);
-    setEditingUser(null);
-    toast.success('User updated successfully!');
-  };
+    const loadToast = toast.loading('Updating user in database...');
+    try {
+      const rowData = [
+        editingUser.name.trim(),
+        editingUser.id.trim(),
+        editingUser.password.trim(),
+        editingUser.role
+      ];
 
-  const handleDeleteUser = (userId) => {
-    if (confirm('Are you sure you want to delete this user?')) {
-      const updatedUsers = users.filter(u => u.id !== userId);
-      setUsers(updatedUsers);
-      saveUsers(updatedUsers);
-      toast.success('User deleted!');
+      const result = await productionAPI.updateRow('Login', editingUser.rowIndex, rowData);
+      if (result.success) {
+        toast.success('User updated successfully!', { id: loadToast });
+        setEditingUserId(null);
+        setEditingUser(null);
+        await fetchUsers();
+      } else {
+        toast.error(`Failed to update user: ${result.error}`, { id: loadToast });
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Error updating user', { id: loadToast });
     }
   };
 
-  const handleAddUserSubmit = (e) => {
+  const handleDeleteUser = async (userToDelete) => {
+    if (confirm(`Are you sure you want to delete user "${userToDelete.name}"?`)) {
+      const loadToast = toast.loading('Deleting user from database...');
+      try {
+        const result = await productionAPI.deleteRow('Login', userToDelete.rowIndex);
+        if (result.success) {
+          toast.success('User deleted!', { id: loadToast });
+          await fetchUsers();
+        } else {
+          toast.error(`Failed to delete user: ${result.error}`, { id: loadToast });
+        }
+      } catch (err) {
+        console.error(err);
+        toast.error('Error deleting user', { id: loadToast });
+      }
+    }
+  };
+
+  const handleAddUserSubmit = async (e) => {
     e.preventDefault();
 
     if (!newUser.id.trim() || !newUser.name.trim() || !newUser.password.trim()) {
@@ -68,25 +130,33 @@ export default function Settings() {
       return;
     }
 
-    const updatedUsers = [...users, {
-      id: newUser.id.trim(),
-      name: newUser.name.trim(),
-      password: newUser.password.trim(),
-      role: newUser.role
-    }];
+    const loadToast = toast.loading('Adding user to database...');
+    try {
+      const rowData = [
+        newUser.name.trim(),
+        newUser.id.trim(),
+        newUser.password.trim(),
+        newUser.role
+      ];
 
-    setUsers(updatedUsers);
-    saveUsers(updatedUsers);
-    
-    // Reset state
-    setNewUser({
-      id: '',
-      name: '',
-      password: '',
-      role: 'USER'
-    });
-    setShowAddUserModal(false);
-    toast.success('New user added successfully!');
+      const result = await productionAPI.insertRow('Login', rowData, { headerRow: 1 });
+      if (result.success) {
+        toast.success('New user added successfully!', { id: loadToast });
+        setNewUser({
+          id: '',
+          name: '',
+          password: '',
+          role: 'USER'
+        });
+        setShowAddUserModal(false);
+        await fetchUsers();
+      } else {
+        toast.error(`Failed to add user: ${result.error}`, { id: loadToast });
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Error adding user', { id: loadToast });
+    }
   };
 
   const filteredUsers = useMemo(() => {
@@ -102,6 +172,33 @@ export default function Settings() {
       return true;
     });
   }, [users, searchQuery]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading Users...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] p-6 text-center space-y-4">
+        <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center text-red-600 shadow-md">
+          <ShieldAlert className="w-8 h-8" />
+        </div>
+        <div className="max-w-md space-y-2">
+          <h2 className="text-xl font-bold text-gray-900">Access Denied</h2>
+          <p className="text-gray-500 text-sm">
+            Only administrators are allowed to create, update, or delete users from the settings page.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
   const paginatedUsers = filteredUsers.slice(
@@ -203,7 +300,7 @@ export default function Settings() {
               <Edit2 size={12} /> Edit
             </button>
             <button
-              onClick={() => handleDeleteUser(user.id)}
+              onClick={() => handleDeleteUser(user)}
               className="flex items-center gap-1 text-red-600 hover:text-red-800 transition text-[11px]"
             >
               <Trash2 size={12} /> Delete
@@ -324,7 +421,7 @@ export default function Settings() {
             <Edit2 size={12} /> Edit
           </button>
           <button
-            onClick={() => handleDeleteUser(user.id)}
+            onClick={() => handleDeleteUser(user)}
             className="flex-1 py-2 bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-800 rounded-lg text-[10px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 border border-red-100"
           >
             <Trash2 size={12} /> Delete

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { User, Lock, Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '../store/authStore';
-import { getUsers } from '../utils/storageManager';
+import { productionAPI } from '../services/api';
 import botivateLogoB from '../Assets/logo.png';
 import Footer from '../components/Footer';
 
@@ -20,16 +20,32 @@ const Login = () => {
     setSubmitting(true);
 
     try {
-      const users = getUsers();
-      const matchedUser = users.find(
-        (u) => u.id === id && u.password === password
-      );
+      const result = await productionAPI.getSheetData('Login', { headerRow: 1 });
+      if (!result.success || !result.records) {
+        toast.error('Could not fetch user credentials from sheet');
+        setSubmitting(false);
+        return;
+      }
 
-      if (!matchedUser) {
+      const records = result.records;
+      const matchedRecord = records.find((r) => {
+        const rowUser = (r.username || r.userName || r.__rowValues?.[1] || '').toString().trim();
+        const rowPass = (r.password || r.__rowValues?.[2] || '').toString().trim();
+        return rowUser.toLowerCase() === id.trim().toLowerCase() && rowPass === password;
+      });
+
+      if (!matchedRecord) {
         toast.error('Invalid credentials');
         setSubmitting(false);
         return;
       }
+
+      const matchedUser = {
+        id: (matchedRecord.username || matchedRecord.userName || matchedRecord.__rowValues?.[1] || '').toString().trim(),
+        name: (matchedRecord['full-Name'] || matchedRecord['Full-Name'] || matchedRecord.fullName || matchedRecord.fullname || matchedRecord.__rowValues?.[0] || '').toString().trim(),
+        password: (matchedRecord.password || matchedRecord.__rowValues?.[2] || '').toString().trim(),
+        role: (matchedRecord.role || matchedRecord.__rowValues?.[3] || 'USER').toString().trim()
+      };
 
       toast.success('Login successful!');
       login(matchedUser);
@@ -44,16 +60,6 @@ const Login = () => {
 
   const togglePasswordVisibility = () => {
     setShowPassword(!showPassword);
-  };
-
-  const handleDemoCredential = (userId) => {
-    if (userId === 'admin') {
-      setId('admin');
-      setPassword('admin123');
-    } else if (userId === 'user') {
-      setId('user');
-      setPassword('user123');
-    }
   };
 
   return (
@@ -151,39 +157,6 @@ const Login = () => {
               )}
             </button>
           </form>
-
-          {/* Divider */}
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-200"></div>
-            </div>
-            <div className="relative flex justify-center text-xs">
-              <span className="px-2 bg-white text-gray-500 font-semibold">Demo Credentials</span>
-            </div>
-          </div>
-
-          {/* Demo Credentials */}
-          <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
-            <p className="text-[10px] font-semibold text-gray-500 text-center mb-2 uppercase tracking-wider">Quick Login Options</p>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => handleDemoCredential('admin')}
-                className="flex flex-col items-center justify-center p-2 bg-white border border-gray-200 hover:border-sky-500 hover:shadow-md hover:bg-sky-50 rounded-lg transition-all group"
-              >
-                <span className="font-bold text-gray-800 text-xs group-hover:text-sky-700">Admin</span>
-                <span className="text-[9px] text-gray-500 font-mono mt-0.5">ID: admin</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDemoCredential('user')}
-                className="flex flex-col items-center justify-center p-2 bg-white border border-gray-200 hover:border-sky-500 hover:shadow-md hover:bg-sky-50 rounded-lg transition-all group"
-              >
-                <span className="font-bold text-gray-800 text-xs group-hover:text-sky-700">User</span>
-                <span className="text-[9px] text-gray-500 font-mono mt-0.5">ID: user</span>
-              </button>
-            </div>
-          </div>
         </div>
       </div>
 

@@ -19,15 +19,15 @@ export default function FullKittingApproval() {
   const [activeTab, setActiveTab] = useState('pending');
 
   const pendingToggleableHeaders = useMemo(() => [
-    "S NO", "Timestamp", "Product code", "Product Name", "BAse Cat", "Order Quantity", "Raw Names", "Raw Quantities", "FG Available Qty", "Total Raw Required Qty", "Total Raw Cost", "Extra Amount", "Total Production Cost", "Selling Price", "Profit / Loss Amount", "Profit / Loss %", "Costing Image"
+    "S NO", "Timestamp", "Product code", "Product Name", "BAse Cat", "Order Quantity", "Raw Names", "Raw Quantities", "FG Available Qty", "Total Raw Required Qty", "Total Raw Cost", "Extra Amount", "Total Production Cost", "Selling Price", "Profit / Loss Amount", "Profit / Loss %", "Costing PDF"
   ], []);
 
   const historyToggleableHeaders = useMemo(() => [
-    "JOB Card No.", "S NO", "Timestamp", "Product code", "Product Name", "BAse Cat", "Order Quantity", "Raw Names", "Raw Quantities", "FG Available Qty", "Total Raw Required Qty", "Total Raw Cost", "Extra Amount", "Total Production Cost", "Selling Price", "Profit / Loss Amount", "Profit / Loss %", "Status", "Costing Image"
+    "JOB Card No.", "S NO", "Timestamp", "Product code", "Product Name", "BAse Cat", "Order Quantity", "Raw Names", "Raw Quantities", "FG Available Qty", "Total Raw Required Qty", "Total Raw Cost", "Extra Amount", "Total Production Cost", "Selling Price", "Profit / Loss Amount", "Profit / Loss %", "Status", "Costing PDF"
   ], []);
 
   const [visibleColumns, setVisibleColumns] = useState([
-    "JOB Card No.", "S NO", "Timestamp", "Product code", "Product Name", "BAse Cat", "Order Quantity", "Raw Names", "Raw Quantities", "FG Available Qty", "Total Raw Required Qty", "Total Raw Cost", "Extra Amount", "Total Production Cost", "Selling Price", "Profit / Loss Amount", "Profit / Loss %", "Status", "Costing Image"
+    "JOB Card No.", "S NO", "Timestamp", "Product code", "Product Name", "BAse Cat", "Order Quantity", "Raw Names", "Raw Quantities", "FG Available Qty", "Total Raw Required Qty", "Total Raw Cost", "Extra Amount", "Total Production Cost", "Selling Price", "Profit / Loss Amount", "Profit / Loss %", "Status", "Costing PDF"
   ]);
 
   const handleToggleColumn = (columnName) => {
@@ -128,7 +128,7 @@ export default function FullKittingApproval() {
             sellingPrice: parseStringToNumber(record.sellingPrice || 0),
             profitLoss: parseStringToNumber(record.profitLoss !== undefined ? record.profitLoss : (record['profit/LossAmount'] || 0)),
             profitLossPercent: parseStringToNumber(record.profitLossPercent !== undefined ? record.profitLossPercent : (record['profit/Loss%'] || 0)),
-            costingImage: record.pDFLink || record.pdfLink || record.costingImage || '',
+            pdfLink: record.pdfLink || record.pDFLink || record.costingImage || record.__rowValues?.[18] || '',
             status: matchedOrder
               ? (matchedOrder.checkJc
                 ? (matchedOrder.checkJc.toLowerCase() === 'rejected' ? 'Rejected' : 'Approved')
@@ -187,7 +187,7 @@ export default function FullKittingApproval() {
           profitLoss: matchedCosting ? matchedCosting.profitLoss : 0,
           profitLossPercent: matchedCosting ? matchedCosting.profitLossPercent : 0,
           status: record.approvalStatus || 'Approved',
-          costingImage: matchedCosting ? matchedCosting.costingImage : '',
+          pdfLink: record.pdfLink || record.pDFLink || (matchedCosting ? matchedCosting.pdfLink : ''),
           remarks: record.approvalRemarks || ''
         };
       });

@@ -51,6 +51,21 @@ const SEEDED_TRANSACTIONS = [
   { id: 'tx-010', serialNo: 'TX-010', date: '2026-06-04', type: 'Sales', itemCode: 'IT-005', itemName: 'TMT Steel Rod 12mm', category: 'Raw Materials', brand: 'Tata Steel', price: 550, qty: 10, totalPrice: 5500 }
 ];
 
+const formatIndianNumber = (num) => {
+  if (num === undefined || num === null || isNaN(Number(num))) return '0';
+  const val = Number(num);
+  if (val >= 10000000) {
+    return `${(val / 10000000).toFixed(2).replace(/\.00$/, '')} Cr`;
+  }
+  if (val >= 100000) {
+    return `${(val / 100000).toFixed(2).replace(/\.00$/, '')} L`;
+  }
+  if (val >= 1000) {
+    return `${(val / 1000).toFixed(2).replace(/\.00$/, '')} K`;
+  }
+  return val.toString();
+};
+
 export default function Dasboard() {
   const masterItems = SEEDED_ITEMS;
 
@@ -78,26 +93,109 @@ export default function Dasboard() {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [ordersRes, kittingRes, prodRes, testingRes, inventoryRes] = await Promise.all([
+        const [ordersRes, jobCardRes, actualProdRes, costingRes, inventoryRes] = await Promise.all([
           productionAPI.getSheetData('PRODUCTION_ORDERS', { headerRow: 6 }),
-          productionAPI.getSheetData('Kitting Approval History'),
-          productionAPI.getSheetData('Actual Production'),
-          productionAPI.getSheetData('Quality Testing'),
-          productionAPI.getSheetData('Inventory')
+          productionAPI.getSheetData('JOB CARD', { headerRow: 6 }),
+          productionAPI.getSheetData('ACTUAL PRODUCTION', { headerRow: 6 }),
+          productionAPI.getSheetData('Costing-History', { headerRow: 1 }),
+          productionAPI.getSheetData('Live IMS', { headerRow: 1 })
         ]);
 
+        let transformedOrders = [];
         if (ordersRes.success) {
-          setOrders(ordersRes.records || []);
+          transformedOrders = (ordersRes.records || []).map(order => ({
+            id: order.rowIndex?.toString() || `po-${order.sNo}`,
+            sNo: order.sNo,
+            timestamp: order.timestamp,
+            productCode: order.productCode || '',
+            productName: order.productName || '',
+            baseCat: order.baseCat || '',
+            qty: Number(order.qty) || 0,
+            godown: order.godown || '',
+            checkJc: order.checkJc || '',
+            actual1: order.actual1 || ''
+          }));
+          setOrders(transformedOrders);
         }
-        if (kittingRes.success) {
-          setKittingHistory(kittingRes.records || []);
+
+        if (costingRes.success && ordersRes.success) {
+          const transformedKitting = (costingRes.records || []).map(record => {
+            const firstSNo = String(record.sNo).split(',')[0]?.trim();
+            const matchedOrder = transformedOrders.find(o => String(o.sNo).trim() === firstSNo);
+            return {
+              id: record.rowIndex?.toString() || `hist-${record.sNo}`,
+              rowIndex: record.rowIndex,
+              sNo: record.sNo,
+              timestamp: record.timestamp,
+              productCode: matchedOrder ? matchedOrder.productCode : '',
+              productName: matchedOrder ? matchedOrder.productName : (record.fGName || record.fgName || ''),
+              baseCat: matchedOrder ? matchedOrder.baseCat : '',
+              qty: Number(record.planQty || record.qty || (matchedOrder ? matchedOrder.qty : 0)) || 0,
+              status: matchedOrder
+                ? (matchedOrder.checkJc
+                  ? (matchedOrder.checkJc.toLowerCase() === 'rejected' ? 'Rejected' : 'Approved')
+                  : (matchedOrder.actual1 ? 'Pending' : 'Draft'))
+                : 'Pending'
+            };
+          });
+          setKittingHistory(transformedKitting);
         }
-        if (prodRes.success) {
-          setProductionHistory(prodRes.records || []);
+
+        if (actualProdRes.success) {
+          const transformedProduction = (actualProdRes.records || []).map(record => ({
+            id: record.rowIndex?.toString() || `prod-${record.sNo}`,
+            rowIndex: record.rowIndex,
+            jobCardNo: record.jCJobCard || record['jC-JobCard'] || record.jcJobCard || record.jobCardNo || '',
+            sNo: record.sNo,
+            timestamp: record.timestamp,
+            productCode: record.productCode || '',
+            productName: record.productName || '',
+            qty: Number(record.qty) || 0,
+            dateOfProduction: record.dateOfProduction || '',
+            rawName1: record.rawName1 || '',
+            rawQty1: record.rawQty1 || '',
+            rawName2: record.rawName2 || '',
+            rawQty2: record.rawQty2 || '',
+            rawName3: record.rawName3 || '',
+            rawQty3: record.rawQty3 || '',
+            rawName4: record.rawName4 || '',
+            rawQty4: record.rawQty4 || '',
+            rawName5: record.rawName5 || '',
+            rawQty5: record.rawQty5 || '',
+            rawName6: record.rawName6 || '',
+            rawQty6: record.rawQty6 || '',
+            rawName7: record.rawName7 || '',
+            rawQty7: record.rawQty7 || '',
+            rawName8: record.rawName8 || '',
+            rawQty8: record.rawQty8 || '',
+            rawName9: record.rawName9 || '',
+            rawQty9: record.rawQty9 || '',
+            rawName10: record.rawName10 || '',
+            rawQty10: record.rawQty10 || '',
+          }));
+          setProductionHistory(transformedProduction);
         }
-        if (testingRes.success) {
-          setTestingHistory(testingRes.records || []);
+
+        if (jobCardRes.success) {
+          const historyJobCards = (jobCardRes.records || []).filter(row => {
+            const valAJ = row.__rowValues && row.__rowValues[35];
+            const valAK = row.__rowValues && row.__rowValues[36];
+            return valAJ && valAK && valAJ.toString().trim() !== '' && valAK.toString().trim() !== '';
+          });
+          const transformedTesting = historyJobCards.map(jc => {
+            const testingStatus = jc.__rowValues?.[38] || 'Approved';
+            return {
+              id: jc.id,
+              rowIndex: jc.rowIndex,
+              jobCardNo: jc.jobCardNo || jc.jCJobCard || jc.jcJobCard || '',
+              sNo: jc.sNo,
+              timestamp: jc.timestamp,
+              testingStatus: testingStatus
+            };
+          });
+          setTestingHistory(transformedTesting);
         }
+
         if (inventoryRes.success) {
           let fetchedData = inventoryRes.records || [];
           const masterItemsList = SEEDED_ITEMS;
@@ -198,10 +296,9 @@ export default function Dasboard() {
   const kpiStats = useMemo(() => {
     const totalOrders = orders.length;
 
-    // Kitting completion rate
-    const totalKittings = kittingHistory.length;
+    // Kitting completion rate: approved job cards over total production orders
     const approvedKittings = kittingHistory.filter(h => h.status === 'Approved').length;
-    const kittingRate = totalKittings > 0 ? Math.round((approvedKittings / totalKittings) * 100) : 0;
+    const kittingRate = totalOrders > 0 ? Math.round((approvedKittings / totalOrders) * 100) : 0;
 
     // Production details
     const totalProducedCount = productionHistory.length;
@@ -209,7 +306,7 @@ export default function Dasboard() {
 
     // QA testing pass rate
     const totalTestedCount = testingHistory.length;
-    const approvedTestedCount = testingHistory.filter(t => t.testingStatus === 'Approved').length;
+    const approvedTestedCount = testingHistory.filter(t => (t.testingStatus || '').toLowerCase() === 'approved').length;
     const testingPassRate = totalTestedCount > 0 ? Math.round((approvedTestedCount / totalTestedCount) * 100) : 0;
 
     // Low stock count
@@ -218,7 +315,6 @@ export default function Dasboard() {
     return {
       totalOrders,
       approvedKittings,
-      totalKittings,
       kittingRate,
       totalProducedCount,
       totalProducedQty,
@@ -228,6 +324,51 @@ export default function Dasboard() {
       lowStockCount
     };
   }, [orders, kittingHistory, productionHistory, testingHistory, computedStocks]);
+
+  const topFG = useMemo(() => {
+    const fgTotals = {};
+    productionHistory.forEach(p => {
+      const name = p.productName || p.productCode || 'Unknown';
+      const qty = Number(p.qty) || 0;
+      fgTotals[name] = (fgTotals[name] || 0) + qty;
+    });
+    const sorted = Object.entries(fgTotals)
+      .map(([name, qty]) => ({ name, qty }))
+      .sort((a, b) => b.qty - a.qty);
+    return sorted[0] || { name: 'N/A', qty: 0 };
+  }, [productionHistory]);
+
+  const topRaw = useMemo(() => {
+    const rawTotals = {};
+    productionHistory.forEach(p => {
+      for (let i = 1; i <= 10; i++) {
+        const name = p[`rawName${i}`];
+        const qty = Number(p[`rawQty${i}`]) || 0;
+        if (name && name.trim() !== '') {
+          const cleanName = name.trim().toUpperCase();
+          rawTotals[cleanName] = (rawTotals[cleanName] || 0) + qty;
+        }
+      }
+    });
+    const sorted = Object.entries(rawTotals)
+      .map(([name, qty]) => ({ name, qty }))
+      .sort((a, b) => b.qty - a.qty);
+    return sorted[0] || { name: 'N/A', qty: 0 };
+  }, [productionHistory]);
+
+  const isToday = (dateStr) => {
+    if (!dateStr) return false;
+    const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
+    return dateStr.toString().includes(today);
+  };
+
+  const todayPlanningReport = useMemo(() => {
+    return orders.filter(o => o.timestamp && isToday(o.timestamp));
+  }, [orders]);
+
+  const todayProductionReport = useMemo(() => {
+    return productionHistory.filter(p => isToday(p.timestamp) || isToday(p.dateOfProduction));
+  }, [productionHistory]);
 
   // Group stock data by category for Bar Chart
   const categoryChartData = useMemo(() => {
@@ -365,7 +506,7 @@ export default function Dasboard() {
     <div className="p-0 sm:p-2 md:p-6 space-y-2 md:space-y-6 flex flex-col h-full overflow-y-auto bg-slate-50/20 scrollbar-thin">
 
       {/* KPI Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         {/* Total Orders Card */}
         <div className="bg-white rounded-2xl border border-indigo-50/60 shadow-xs p-5 hover:shadow-md hover:border-indigo-100 transition-all duration-300 flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0">
@@ -387,7 +528,7 @@ export default function Dasboard() {
             <span className="text-[10px] text-gray-400 uppercase tracking-wider font-extrabold block">Full Kitting</span>
             <span className="text-xl font-black text-slate-800 block">{kpiStats.kittingRate}%</span>
             <span className="text-[9px] text-purple-500 font-bold block mt-0.5">
-              {kpiStats.approvedKittings}/{kpiStats.totalKittings} approved
+              {kpiStats.approvedKittings} approved
             </span>
           </div>
         </div>
@@ -412,19 +553,31 @@ export default function Dasboard() {
           <div>
             <span className="text-[10px] text-gray-400 uppercase tracking-wider font-extrabold block">QA Test Pass Rate</span>
             <span className="text-xl font-black text-slate-800 block">{kpiStats.testingPassRate}%</span>
-            <span className="text-[9px] text-blue-500 font-bold block mt-0.5">{kpiStats.approvedTestedCount}/{kpiStats.totalTestedCount} items approved</span>
+            <span className="text-[9px] text-blue-500 font-bold block mt-0.5">{kpiStats.approvedTestedCount} items approved</span>
           </div>
         </div>
 
-        {/* Low Stock Alerts Card */}
+        {/* Top FG Produced Card */}
         <div className="bg-white rounded-2xl border border-indigo-50/60 shadow-xs p-5 hover:shadow-md hover:border-indigo-100 transition-all duration-300 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center flex-shrink-0">
-            <AlertTriangle size={24} />
+          <div className="w-12 h-12 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center flex-shrink-0">
+            <Box size={24} />
           </div>
-          <div>
-            <span className="text-[10px] text-gray-400 uppercase tracking-wider font-extrabold block">Low Stock Alerts</span>
-            <span className="text-xl font-black text-slate-800 block">{kpiStats.lowStockCount}</span>
-            <span className="text-[9px] text-rose-500 font-bold block mt-0.5">Stock below 20% of max level</span>
+          <div className="min-w-0 flex-1">
+            <span className="text-[10px] text-gray-400 uppercase tracking-wider font-extrabold block truncate">Top Product (FG)</span>
+            <span className="text-sm font-black text-slate-800 block truncate uppercase mt-0.5" title={topFG.name}>{topFG.name}</span>
+            <span className="text-[10px] text-orange-500 font-extrabold block mt-0.5">{topFG.qty.toLocaleString('en-IN')} Pcs produced</span>
+          </div>
+        </div>
+
+        {/* Top Raw Material Card */}
+        <div className="bg-white rounded-2xl border border-indigo-50/60 shadow-xs p-5 hover:shadow-md hover:border-indigo-100 transition-all duration-300 flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center flex-shrink-0">
+            <Layers size={24} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <span className="text-[10px] text-gray-400 uppercase tracking-wider font-extrabold block truncate">Top Raw Material</span>
+            <span className="text-sm font-black text-slate-800 block truncate uppercase mt-0.5" title={topRaw.name}>{topRaw.name}</span>
+            <span className="text-[10px] text-amber-600 font-extrabold block mt-0.5">{topRaw.qty.toLocaleString('en-IN')} units consumed</span>
           </div>
         </div>
       </div>
@@ -444,8 +597,9 @@ export default function Dasboard() {
                 <BarChart data={categoryChartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
                   <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: '#64748B', fontWeight: 600, fontSize: 10 }} />
-                  <YAxis tickLine={false} axisLine={false} tick={{ fill: '#64748B', fontWeight: 600 }} />
+                  <YAxis tickLine={false} axisLine={false} tickFormatter={formatIndianNumber} tick={{ fill: '#64748B', fontWeight: 600 }} />
                   <Tooltip
+                    formatter={(value) => [formatIndianNumber(value), 'Quantity']}
                     contentStyle={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                     labelStyle={{ fontWeight: 'extrabold', color: '#1E293B', textTransform: 'uppercase', fontSize: '11px' }}
                   />
@@ -500,6 +654,97 @@ export default function Dasboard() {
                 <span className="text-slate-600">{d.name} ({d.value})</span>
               </div>
             ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Today's Planning & Production Reports */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        {/* Today's Planning Report */}
+        <div className="bg-white rounded-2xl border border-indigo-50 shadow-xs p-5 flex flex-col min-w-0">
+          <div className="pb-3 border-b border-slate-100 mb-3 flex items-center gap-2">
+            <ClipboardList className="text-indigo-600" size={18} />
+            <div>
+              <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Today's Planning Report</h3>
+              <p className="text-[9px] text-gray-400 font-bold">Production orders created or scheduled for today.</p>
+            </div>
+          </div>
+          <div className="flex-1 overflow-x-auto min-h-[220px] max-h-[300px] scrollbar-thin">
+            {todayPlanningReport.length > 0 ? (
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-indigo-50/30 text-indigo-700 font-black uppercase text-[10px] tracking-wider border-b border-indigo-100/50">
+                    <th className="py-2.5 px-3">S NO</th>
+                    <th className="py-2.5 px-3">Product Code</th>
+                    <th className="py-2.5 px-3">Product Name</th>
+                    <th className="py-2.5 px-3 text-center">Qty</th>
+                    <th className="py-2.5 px-3 text-center">Time</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {todayPlanningReport.map((row, idx) => (
+                    <tr key={row.id || idx} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="py-2 px-3 text-gray-500 font-mono">{row.sNo}</td>
+                      <td className="py-2 px-3 text-indigo-600 font-bold">{row.productCode}</td>
+                      <td className="py-2 px-3 text-gray-800 uppercase font-semibold truncate max-w-[150px]">{row.productName}</td>
+                      <td className="py-2 px-3 text-center text-indigo-600 font-black">{row.qty}</td>
+                      <td className="py-2 px-3 text-center text-gray-400 font-medium">
+                        {row.timestamp ? row.timestamp.split(' ')[1] || row.timestamp : '-'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-gray-400 py-10 space-y-2 font-medium text-center">
+                <ClipboardList size={32} className="text-gray-300 animate-pulse" />
+                <span>No production orders planned today</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Today's Actual Production Report */}
+        <div className="bg-white rounded-2xl border border-indigo-50 shadow-xs p-5 flex flex-col min-w-0">
+          <div className="pb-3 border-b border-slate-100 mb-3 flex items-center gap-2">
+            <Activity className="text-emerald-600" size={18} />
+            <div>
+              <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Today's Actual Production Report</h3>
+              <p className="text-[9px] text-gray-400 font-bold">Actual production log entries submitted today.</p>
+            </div>
+          </div>
+          <div className="flex-1 overflow-x-auto min-h-[220px] max-h-[300px] scrollbar-thin">
+            {todayProductionReport.length > 0 ? (
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-emerald-50/30 text-emerald-700 font-black uppercase text-[10px] tracking-wider border-b border-emerald-100/50">
+                    <th className="py-2.5 px-3">Job Card</th>
+                    <th className="py-2.5 px-3">Product Code</th>
+                    <th className="py-2.5 px-3">Product Name</th>
+                    <th className="py-2.5 px-3 text-center">Qty</th>
+                    <th className="py-2.5 px-3 text-center">Time</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {todayProductionReport.map((row, idx) => (
+                    <tr key={row.id || idx} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="py-2 px-3 text-emerald-600 font-bold">{row.jobCardNo}</td>
+                      <td className="py-2 px-3 text-indigo-600 font-bold">{row.productCode}</td>
+                      <td className="py-2 px-3 text-gray-800 uppercase font-semibold truncate max-w-[150px]">{row.productName}</td>
+                      <td className="py-2 px-3 text-center text-emerald-600 font-black">{row.qty}</td>
+                      <td className="py-2 px-3 text-center text-gray-400 font-medium">
+                        {row.timestamp ? row.timestamp.split(' ')[1] || row.timestamp : '-'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-gray-400 py-10 space-y-2 font-medium text-center">
+                <Activity size={32} className="text-gray-300 animate-pulse" />
+                <span>No production logs submitted today</span>
+              </div>
+            )}
           </div>
         </div>
       </div>

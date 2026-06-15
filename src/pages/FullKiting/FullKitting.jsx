@@ -33,12 +33,12 @@ export default function FullKitting() {
 
   const historyToggleableHeaders = useMemo(() => [
     "Ticket ID", "S NO", "Timestamp", "Product code", "Product Name", "BAse Cat", "Order Quantity",
-    "Raw Names", "Raw Quantities", "FG Available Qty", "Total Raw Required Qty", "Total Raw Cost", "Extra Amount", "Total Production Cost", "Selling Price", "Profit / Loss Amount", "Profit / Loss %", "Costing Image"
+    "Raw Names", "Raw Quantities", "FG Available Qty", "Total Raw Required Qty", "Total Raw Cost", "Extra Amount", "Total Production Cost", "Selling Price", "Profit / Loss Amount", "Profit / Loss %", "Costing PDF"
   ], []);
 
   const [visibleColumns, setVisibleColumns] = useState([
     "S NO", "Timestamp", "Product code", "Product Name", "BAse Cat", "Order Quantity", "GoDown",
-    "Ticket ID", "Raw Names", "Raw Quantities", "FG Available Qty", "Total Raw Required Qty", "Total Raw Cost", "Extra Amount", "Total Production Cost", "Selling Price", "Profit / Loss Amount", "Profit / Loss %", "Costing Image"
+    "Ticket ID", "Raw Names", "Raw Quantities", "FG Available Qty", "Total Raw Required Qty", "Total Raw Cost", "Extra Amount", "Total Production Cost", "Selling Price", "Profit / Loss Amount", "Profit / Loss %", "Costing PDF"
   ]);
 
   const handleToggleColumn = (columnName) => {
@@ -114,7 +114,7 @@ export default function FullKitting() {
             sellingPrice: parseStringToNumber(record.sellingPrice || 0),
             profitLoss: parseStringToNumber(record.profitLoss !== undefined ? record.profitLoss : (record['profit/LossAmount'] || 0)),
             profitLossPercent: parseStringToNumber(record.profitLossPercent !== undefined ? record.profitLossPercent : (record['profit/Loss%'] || 0)),
-            costingImage: record.pDFLink || record.pdfLink || record.costingImage || '',
+            pdfLink: record.pdfLink || record.pDFLink || record.costingImage || record.__rowValues?.[18] || '',
             status: matchedOrder
               ? (matchedOrder.checkJc ? (matchedOrder.checkJc.toLowerCase() === 'rejected' ? 'Rejected' : 'Approved') : 'Pending')
               : 'Pending'

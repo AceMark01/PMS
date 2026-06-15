@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import DataTable from '../../components/DataTable';
-import { Trash2 } from 'lucide-react';
+import { Trash2, FileText } from 'lucide-react';
 
 export default function ApprovalHistory({ data, onDeleteHistory, visibleColumns = [] }) {
   const [currentPage, setCurrentPage] = useState(1);
@@ -34,7 +34,7 @@ export default function ApprovalHistory({ data, onDeleteHistory, visibleColumns 
     "Profit / Loss Amount",
     "Profit / Loss %",
     "Status",
-    "Costing Image"
+    "Costing PDF"
   ];
 
   const tableHeaders = allHeaders.filter(h => h === 'Action' || visibleColumns.includes(h));
@@ -109,16 +109,18 @@ export default function ApprovalHistory({ data, onDeleteHistory, visibleColumns 
             {item.status}
           </span>
         </td>
-        {/* Costing Image */}
-        <td className="px-4 py-3 text-center min-w-[180px]">
-          {item.costingImage ? (
-            <div className="flex justify-center items-center">
-              <img
-                src={item.costingImage}
-                alt="Costing Chart"
-                className="max-h-[48px] w-auto border border-slate-100 rounded bg-white shadow-xs p-0.5 object-contain"
-              />
-            </div>
+        {/* Costing PDF */}
+        <td className="px-4 py-3 text-center min-w-[150px]">
+          {item.pdfLink ? (
+            <a
+              href={item.pdfLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-2.5 py-1 bg-indigo-50 text-indigo-600 rounded hover:bg-indigo-100 transition-all font-bold text-[10px] inline-flex items-center gap-1 border border-indigo-200"
+            >
+              <FileText size={12} />
+              <span>View PDF</span>
+            </a>
           ) : (
             <span className="text-[10px] text-gray-400">N/A</span>
           )}
@@ -162,6 +164,19 @@ export default function ApprovalHistory({ data, onDeleteHistory, visibleColumns 
             <span className="text-gray-400 block uppercase text-[8px] tracking-tight">Total Cost</span>
             <span className="text-slate-900 font-bold">₹{item.totalProductionCost.toLocaleString('en-IN')}</span>
           </div>
+          {item.pdfLink && (
+            <div className="col-span-2 border-t border-slate-100 pt-2 flex justify-center">
+              <a
+                href={item.pdfLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-1.5 bg-indigo-50 text-indigo-600 rounded hover:bg-indigo-100 transition text-[10px] font-bold flex items-center justify-center gap-1 border border-indigo-150"
+              >
+                <FileText size={12} />
+                <span>View PDF Report</span>
+              </a>
+            </div>
+          )}
         </div>
       </div>
     );
