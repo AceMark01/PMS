@@ -21,7 +21,8 @@ const ModalForm = ({
   maxWidth = 'max-w-2xl',
   maxHeight = '85vh',
   zIndex = 'z-[100]',
-  extraFooterAction = null
+  extraFooterAction = null,
+  loading = false
 }) => {
   if (!isOpen) return null;
 
@@ -67,6 +68,7 @@ const ModalForm = ({
             submitText={submitText}
             className="w-full"
             formId="ultra-compact-form"
+            loading={loading}
           />
         </div>
       </div>

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import DataTable from '../../components/DataTable';
 import { Trash2 } from 'lucide-react';
 
-export default function TestingApproval({ data, onDeleteHistory }) {
+export default function TestingApproval({ data, onDeleteHistory, visibleColumns = [] }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
 
@@ -12,7 +12,7 @@ export default function TestingApproval({ data, onDeleteHistory }) {
     currentPage * itemsPerPage
   );
 
-  const tableHeaders = [
+  const allHeaders = [
     "Action",
     "Timestamp",
     "JC-Job Card",
@@ -46,8 +46,11 @@ export default function TestingApproval({ data, onDeleteHistory }) {
     "Raw Qty10"
   ];
 
+  const tableHeaders = allHeaders.filter(h => h === 'Action' || visibleColumns.includes(h));
+
   const renderRow = (item, idx) => {
     const isApproved = item.testingStatus === 'Approved';
+
     return (
       <tr key={item.id || idx} className="hover:bg-indigo-50/30 transition-colors border-b border-gray-100">
         {/* Action: Delete record */}
@@ -94,7 +97,7 @@ export default function TestingApproval({ data, onDeleteHistory }) {
         </td>
         
         {/* Testing Remarks */}
-        <td className="px-4 py-3 text-center text-xs text-gray-505 min-w-[150px] whitespace-normal break-words">{item.testingRemarks || '-'}</td>
+        <td className="px-4 py-3 text-center text-xs text-gray-55 min-w-[150px] whitespace-normal break-words">{item.testingRemarks || '-'}</td>
         
         {/* Raw Names 1-10 */}
         <td className="px-4 py-3 text-center text-[11px] text-slate-600 whitespace-nowrap">{item.rawName1 || '-'}</td>
@@ -169,6 +172,8 @@ export default function TestingApproval({ data, onDeleteHistory }) {
       <div className="flex-1 min-h-0 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
         <DataTable
           headers={tableHeaders}
+          allHeaders={allHeaders}
+          visibleColumns={visibleColumns}
           data={paginatedHistory}
           renderRow={renderRow}
           renderCard={renderCard}

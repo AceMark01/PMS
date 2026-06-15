@@ -4,11 +4,42 @@ import { ClipboardCheck, CheckCircle, History, Search, RotateCcw } from 'lucide-
 import ActualProductionPending from './ActualProductionPending';
 import ActualProductionHistory from './ActualProductionHistory';
 import ActualProductionForm from './ActualProductionForm';
+import ColumnToggle from '../../components/ColumnToggle';
 import { TabSwitcher } from '../../components/StandardButtons';
 import { productionAPI } from '../../services/api';
 
+const parseStringToNumber = (val) => {
+  if (val === undefined || val === null || val === '') return 0;
+  const clean = val.toString().replace(/[^\d.-]/g, '');
+  const num = Number(clean);
+  return isNaN(num) ? 0 : num;
+};
+
 export default function ActualProduction() {
   const [activeTab, setActiveTab] = useState('pending');
+
+  const pendingToggleableHeaders = useMemo(() => [
+    "JOB Card No.", "S NO", "Timestamp", "Product code", "Product Name", "BAse Cat", "Order Quantity", "Raw Names", "Raw Quantities", "FG Available Qty", "Total Raw Required Qty", "Total Raw Cost", "Extra Amount", "Total Production Cost", "Selling Price", "Profit / Loss Amount", "Profit / Loss %", "Status", "Costing Image"
+  ], []);
+
+  const historyToggleableHeaders = useMemo(() => [
+    "Timestamp", "JC-Job Card", "S NO", "ProductCode", "Product Name", "Order Quantity",
+    "Raw Name1", "Raw Qty1", "Raw Name2", "Raw Qty2", "Raw Name3", "Raw Qty3", "Raw Name4", "Raw Qty4", "Raw Name5", "Raw Qty5", "Raw Name6", "Raw Qty6", "Raw Name7", "Raw Qty7", "Raw Name8", "Raw Qty8", "Raw Name9", "Raw Qty9", "Raw Name10", "Raw Qty10"
+  ], []);
+
+  const [visibleColumns, setVisibleColumns] = useState([
+    "JOB Card No.", "S NO", "Timestamp", "Product code", "Product Name", "BAse Cat", "Order Quantity", "Raw Names", "Raw Quantities", "FG Available Qty", "Total Raw Required Qty", "Total Raw Cost", "Extra Amount", "Total Production Cost", "Selling Price", "Profit / Loss Amount", "Profit / Loss %", "Status", "Costing Image",
+    "JC-Job Card", "ProductCode",
+    "Raw Name1", "Raw Qty1", "Raw Name2", "Raw Qty2", "Raw Name3", "Raw Qty3", "Raw Name4", "Raw Qty4", "Raw Name5", "Raw Qty5", "Raw Name6", "Raw Qty6", "Raw Name7", "Raw Qty7", "Raw Name8", "Raw Qty8", "Raw Name9", "Raw Qty9", "Raw Name10", "Raw Qty10"
+  ]);
+
+  const handleToggleColumn = (columnName) => {
+    setVisibleColumns(prev => 
+      prev.includes(columnName)
+        ? prev.filter(c => c !== columnName)
+        : [...prev, columnName]
+    );
+  };
 
   const [kittingHistory, setKittingHistory] = useState([]);
   const [productionHistory, setProductionHistory] = useState([]);
@@ -23,21 +54,89 @@ export default function ActualProduction() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [kittingResult, prodResult, bomResult, invResult] = await Promise.all([
-        productionAPI.getKittingApprovalHistory(),
-        productionAPI.getActualProduction(),
-        productionAPI.getBOM(),
-        productionAPI.getInventory()
+      const [jobCardResult, prodResult, bomResult, invResult, costingResult] = await Promise.all([
+        productionAPI.getSheetData('JOB CARD', { headerRow: 6 }),
+        productionAPI.getSheetData('ACTUAL PRODUCTION', { headerRow: 6 }),
+        productionAPI.getSheetData('BOM'),
+        productionAPI.getSheetData('Live IMS'),
+        productionAPI.getSheetData('Costing-History')
       ]);
 
-      if (kittingResult.success) {
-        setKittingHistory(kittingResult.records);
+      if (jobCardResult.success && costingResult.success) {
+        const transformedJobCards = jobCardResult.records.map(record => {
+          const firstSNo = String(record.sNo).split(',')[0]?.trim();
+          const matchedCosting = (costingResult.records || []).find(
+            c => String(c.sNo).trim().split(',')[0]?.trim() === firstSNo
+          );
+
+          return {
+            id: record.rowIndex?.toString() || `jc-${record.sNo}`,
+            rowIndex: record.rowIndex,
+            jobCardNo: record.jCJobCard || record['jC-JobCard'] || record.jcJobCard || record.jobCardNo || '',
+            sNo: record.sNo,
+            timestamp: record.timestamp,
+            productCode: record.productCode || '',
+            productName: record.productName || '',
+            qty: Number(record.qty) || 0,
+            dateOfProduction: record.dateOfProduction || '',
+            status: record.approvalStatus || 'Approved',
+            remarks: record.approvalRemarks || '',
+            
+            // Costing fields from matching costing history record
+            rawNames: matchedCosting ? (matchedCosting.requiredRawMaterialName || matchedCosting.rawNames || '') : '',
+            rawQuantities: matchedCosting ? (matchedCosting.rawQty || matchedCosting.rawQuantities || '') : '',
+            fgAvailableQty: matchedCosting ? parseStringToNumber(matchedCosting.fGAvailableQty || matchedCosting.fgAvailableQty || 0) : 0,
+            totalRawRequiredQty: matchedCosting ? parseStringToNumber(matchedCosting.totalRawRequiredQty || 0) : 0,
+            totalRawCost: matchedCosting ? parseStringToNumber(matchedCosting.totalRawCost || 0) : 0,
+            extraAmount: matchedCosting ? parseStringToNumber(matchedCosting.extraAmount || 0) : 0,
+            totalProductionCost: matchedCosting ? parseStringToNumber(matchedCosting.totalProductionCost || 0) : 0,
+            sellingPrice: matchedCosting ? parseStringToNumber(matchedCosting.sellingPrice || 0) : 0,
+            profitLoss: matchedCosting ? parseStringToNumber(matchedCosting.profitLoss !== undefined ? matchedCosting.profitLoss : (matchedCosting['profit/LossAmount'] || 0)) : 0,
+            profitLossPercent: matchedCosting ? parseStringToNumber(matchedCosting.profitLossPercent !== undefined ? matchedCosting.profitLossPercent : (matchedCosting['profit/Loss%'] || 0)) : 0,
+            costingImage: matchedCosting ? (matchedCosting.pDFLink || matchedCosting.pdfLink || matchedCosting.costingImage || '') : '',
+            
+            __rowValues: record.__rowValues
+          };
+        });
+        setKittingHistory(transformedJobCards);
       } else {
-        toast.error(`Failed to load approvals: ${kittingResult.error}`);
+        toast.error(`Failed to load kitting approvals: ${jobCardResult.error || costingResult.error}`);
       }
 
       if (prodResult.success) {
-        setProductionHistory(prodResult.records);
+        const transformedHistory = prodResult.records.map(record => ({
+          id: record.rowIndex?.toString() || `prod-${record.sNo}`,
+          rowIndex: record.rowIndex,
+          jobCardNo: record.jCJobCard || record['jC-JobCard'] || record.jcJobCard || record.jobCardNo || '',
+          sNo: record.sNo,
+          timestamp: record.timestamp,
+          productCode: record.productCode || '',
+          productName: record.productName || '',
+          qty: Number(record.qty) || 0,
+          dateOfProduction: record.dateOfProduction || '',
+          rawName1: record.rawName1 || '',
+          rawQty1: record.rawQty1 || '',
+          rawName2: record.rawName2 || '',
+          rawQty2: record.rawQty2 || '',
+          rawName3: record.rawName3 || '',
+          rawQty3: record.rawQty3 || '',
+          rawName4: record.rawName4 || '',
+          rawQty4: record.rawQty4 || '',
+          rawName5: record.rawName5 || '',
+          rawQty5: record.rawQty5 || '',
+          rawName6: record.rawName6 || '',
+          rawQty6: record.rawQty6 || '',
+          rawName7: record.rawName7 || '',
+          rawQty7: record.rawQty7 || '',
+          rawName8: record.rawName8 || '',
+          rawQty8: record.rawQty8 || '',
+          rawName9: record.rawName9 || '',
+          rawQty9: record.rawQty9 || '',
+          rawName10: record.rawName10 || '',
+          rawQty10: record.rawQty10 || '',
+          __rowValues: record.__rowValues
+        }));
+        setProductionHistory(transformedHistory);
       } else {
         toast.error(`Failed to load production logs: ${prodResult.error}`);
       }
@@ -67,10 +166,18 @@ export default function ActualProduction() {
 
   // Filter approved costing cards that are not yet in production history
   const pendingProduction = useMemo(() => {
-    const approvedKittings = kittingHistory.filter(h => h.status && h.status.trim().toLowerCase() === 'approved');
-    const producedIds = new Set(productionHistory.map(p => String(p.sNo).trim()));
-    return approvedKittings.filter(k => !producedIds.has(String(k.sNo).trim()));
-  }, [kittingHistory, productionHistory]);
+    return kittingHistory.filter(row => {
+      // Check col-AG (index 32) is not null/empty
+      const valAG = row.__rowValues && row.__rowValues[32];
+      const hasAG = valAG !== undefined && valAG !== null && valAG.toString().trim() !== '';
+
+      // Check col-AH (index 33) is null/empty
+      const valAH = row.__rowValues && row.__rowValues[33];
+      const hasAH = valAH !== undefined && valAH !== null && valAH.toString().trim() !== '';
+
+      return hasAG && !hasAH;
+    });
+  }, [kittingHistory]);
 
   // Filter pending items by search query
   const filteredPending = useMemo(() => {
@@ -125,7 +232,7 @@ export default function ActualProduction() {
   const handleSubmitProduction = async (kittingRecordId, productionRecord) => {
     setLoading(true);
     try {
-      const result = await productionAPI.addActualProduction(productionRecord);
+      const result = await productionAPI.insertRow('ACTUAL PRODUCTION', productionRecord, { headerRow: 6 });
       if (result.success) {
         toast.success('Actual production log successfully submitted!');
         setIsFormOpen(false);
@@ -151,7 +258,7 @@ export default function ActualProduction() {
     if (window.confirm('Are you sure you want to delete this production log? This will revert the record back to Pending Production.')) {
       setLoading(true);
       try {
-        const result = await productionAPI.deleteActualProduction(record.sNo);
+        const result = await productionAPI.deleteRow('ACTUAL PRODUCTION', record.rowIndex);
         if (result.success) {
           toast.success('Production record removed and order reverted to pending production.');
           await fetchData();
@@ -210,6 +317,12 @@ export default function ActualProduction() {
           >
             <RotateCcw size={15} />
           </button>
+
+          <ColumnToggle
+            headers={activeTab === 'pending' ? pendingToggleableHeaders : historyToggleableHeaders}
+            visibleColumns={visibleColumns}
+            onToggleColumn={handleToggleColumn}
+          />
         </div>
       </div>
 
@@ -219,11 +332,13 @@ export default function ActualProduction() {
           <ActualProductionPending
             data={filteredPending}
             onOpenProductionForm={handleOpenProductionForm}
+            visibleColumns={visibleColumns}
           />
         ) : (
           <ActualProductionHistory
             data={filteredHistory}
             onDeleteHistory={handleDeleteHistory}
+            visibleColumns={visibleColumns}
           />
         )}
       </div>

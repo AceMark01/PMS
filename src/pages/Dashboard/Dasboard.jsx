@@ -79,15 +79,15 @@ export default function Dasboard() {
       setLoading(true);
       try {
         const [ordersRes, kittingRes, prodRes, testingRes, inventoryRes] = await Promise.all([
-          productionAPI.getProductionOrders(),
-          productionAPI.getKittingApprovalHistory(),
-          productionAPI.getActualProduction(),
-          productionAPI.getTestingHistory(),
-          productionAPI.getInventory()
+          productionAPI.getSheetData('PRODUCTION_ORDERS', { headerRow: 6 }),
+          productionAPI.getSheetData('Kitting Approval History'),
+          productionAPI.getSheetData('Actual Production'),
+          productionAPI.getSheetData('Quality Testing'),
+          productionAPI.getSheetData('Inventory')
         ]);
 
         if (ordersRes.success) {
-          setOrders(ordersRes.orders || []);
+          setOrders(ordersRes.records || []);
         }
         if (kittingRes.success) {
           setKittingHistory(kittingRes.records || []);
@@ -362,7 +362,7 @@ export default function Dasboard() {
   };
 
   return (
-    <div className="p-0 sm:p-2 md:p-6 space-y-2 md:space-y-6 flex flex-col h-full min-h-0 bg-slate-50/20">
+    <div className="p-0 sm:p-2 md:p-6 space-y-2 md:space-y-6 flex flex-col h-full overflow-y-auto bg-slate-50/20 scrollbar-thin">
 
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -537,7 +537,9 @@ export default function Dasboard() {
                   </div>
                   <div className="text-right">
                     <span className="text-xs font-black text-rose-600 block">
-                      {item.currentQty} Qty
+                      {typeof item.currentQty === 'number'
+                        ? item.currentQty.toFixed(3)
+                        : parseFloat(item.currentQty).toFixed(3)} Qty
                     </span>
                     <span className="text-[8px] text-rose-500 font-bold uppercase tracking-wider">
                       Requires order
@@ -635,7 +637,7 @@ export default function Dasboard() {
       </div>
 
       {/* Main Stock Table */}
-      <div className="flex-1 min-h-0 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col h-[500px] flex-shrink-0">
         <DataTable
           headers={tableHeaders}
           data={paginatedStocks}

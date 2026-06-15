@@ -4,13 +4,53 @@ import { Blocks, ClipboardList, History, Search, RotateCcw } from 'lucide-react'
 import KittingPending from './KittingPending';
 import KittingHistory from './KittingHistory';
 import FullKittingForm from './FullKittingForm';
+import ColumnToggle from '../../components/ColumnToggle';
 import SearchableDropdown from '../../components/SearchableDropdown';
 import { TabSwitcher } from '../../components/StandardButtons';
 import { productionAPI } from '../../services/api';
 
+const parseStringToNumber = (val) => {
+  if (val === undefined || val === null || val === '') return 0;
+  const clean = val.toString().replace(/[^\d.-]/g, '');
+  const num = Number(clean);
+  return isNaN(num) ? 0 : num;
+};
+
+const formatDate = (date) => {
+  if (!date) return '';
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+};
+
 export default function FullKitting() {
   const [activeTab, setActiveTab] = useState('pending');
+
+  const pendingToggleableHeaders = useMemo(() => [
+    "S NO", "Timestamp", "Product code", "Product Name", "BAse Cat", "Order Quantity", "GoDown"
+  ], []);
+
+  const historyToggleableHeaders = useMemo(() => [
+    "Ticket ID", "S NO", "Timestamp", "Product code", "Product Name", "BAse Cat", "Order Quantity",
+    "Raw Names", "Raw Quantities", "FG Available Qty", "Total Raw Required Qty", "Total Raw Cost", "Extra Amount", "Total Production Cost", "Selling Price", "Profit / Loss Amount", "Profit / Loss %", "Costing Image"
+  ], []);
+
+  const [visibleColumns, setVisibleColumns] = useState([
+    "S NO", "Timestamp", "Product code", "Product Name", "BAse Cat", "Order Quantity", "GoDown",
+    "Ticket ID", "Raw Names", "Raw Quantities", "FG Available Qty", "Total Raw Required Qty", "Total Raw Cost", "Extra Amount", "Total Production Cost", "Selling Price", "Profit / Loss Amount", "Profit / Loss %", "Costing Image"
+  ]);
+
+  const handleToggleColumn = (columnName) => {
+    setVisibleColumns(prev => 
+      prev.includes(columnName)
+        ? prev.filter(c => c !== columnName)
+        : [...prev, columnName]
+    );
+  };
+
   const [orders, setOrders] = useState([]);
+  const [kittingHistory, setKittingHistory] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Filter Toolbar States
@@ -24,9 +64,14 @@ export default function FullKitting() {
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      const result = await productionAPI.getProductionOrders();
+      const [result, historyResult] = await Promise.all([
+        productionAPI.getSheetData('PRODUCTION_ORDERS', { headerRow: 6 }),
+        productionAPI.getSheetData('Costing-History')
+      ]);
+
+      let transformedOrders = [];
       if (result.success) {
-        const transformedOrders = result.orders.map(order => ({
+        transformedOrders = result.records.map(order => ({
           id: order.sNo?.toString() || `po-${order.sNo}`,
           sNo: order.sNo,
           timestamp: order.timestamp,
@@ -35,22 +80,49 @@ export default function FullKitting() {
           baseCat: order.baseCat || '',
           qty: Number(order.qty) || 0,
           godown: order.godown || '',
-          rawNames: order.rawNames || '',
-          rawQuantities: order.rawQuantities || '',
-          fgAvailableQty: Number(order.fgAvailableQty) || 0,
-          totalRawRequiredQty: Number(order.totalRawRequiredQty) || 0,
-          totalRawCost: Number(order.totalRawCost) || 0,
-          extraAmount: Number(order.extraAmount) || 0,
-          totalProductionCost: Number(order.totalProductionCost) || 0,
-          sellingPrice: Number(order.sellingPrice) || 0,
-          profitLoss: Number(order.profitLoss) || 0,
-          profitLossPercent: Number(order.profitLossPercent) || 0,
-          costingImage: order.costingImage || '',
-          checkJc: order.checkJc || ''
+          checkJc: order.checkJc || '',
+          planned1: order.planned1 || '',
+          actual1: order.actual1 || ''
         }));
         setOrders(transformedOrders);
       } else {
         toast.error(`Failed to load orders: ${result.error}`);
+      }
+
+      if (historyResult.success) {
+        const transformedHistory = (historyResult.records || []).map(record => {
+          const firstSNo = String(record.sNo).split(',')[0]?.trim();
+          const matchedOrder = transformedOrders.find(o => String(o.sNo).trim() === firstSNo);
+
+          return {
+            id: record.rowIndex?.toString() || `hist-${record.sNo}`,
+            rowIndex: record.rowIndex,
+            kittingTicket: record.kittingTicket || '',
+            sNo: record.sNo,
+            timestamp: record.timestamp,
+            productCode: matchedOrder ? matchedOrder.productCode : '',
+            productName: matchedOrder ? matchedOrder.productName : (record.fGName || record.fgName || ''),
+            baseCat: matchedOrder ? matchedOrder.baseCat : '',
+            qty: parseStringToNumber(record.planQty || record.qty || (matchedOrder ? matchedOrder.qty : 0)),
+            rawNames: record.requiredRawMaterialName || record.rawNames || '',
+            rawQuantities: record.rawQty || record.rawQuantities || '',
+            fgAvailableQty: parseStringToNumber(record.fGAvailableQty || record.fgAvailableQty || 0),
+            totalRawRequiredQty: parseStringToNumber(record.totalRawRequiredQty || 0),
+            totalRawCost: parseStringToNumber(record.totalRawCost || 0),
+            extraAmount: parseStringToNumber(record.extraAmount || 0),
+            totalProductionCost: parseStringToNumber(record.totalProductionCost || 0),
+            sellingPrice: parseStringToNumber(record.sellingPrice || 0),
+            profitLoss: parseStringToNumber(record.profitLoss !== undefined ? record.profitLoss : (record['profit/LossAmount'] || 0)),
+            profitLossPercent: parseStringToNumber(record.profitLossPercent !== undefined ? record.profitLossPercent : (record['profit/Loss%'] || 0)),
+            costingImage: record.pDFLink || record.pdfLink || record.costingImage || '',
+            status: matchedOrder
+              ? (matchedOrder.checkJc ? (matchedOrder.checkJc.toLowerCase() === 'rejected' ? 'Rejected' : 'Approved') : 'Pending')
+              : 'Pending'
+          };
+        });
+        setKittingHistory(transformedHistory);
+      } else {
+        toast.error(`Failed to load kitting history: ${historyResult.error}`);
       }
     } catch (err) {
       console.error(err);
@@ -64,11 +136,13 @@ export default function FullKitting() {
     fetchOrders();
   }, []);
 
-  // Filter orders to only display those with 'CUSTOMIZE ORDER' which are not yet processed
+  // Filter orders to only display those where Planned 1 (col-O) is not null, and Actual 1 is null
   const pendingOrders = useMemo(() => {
-    return orders.filter(
-      order => order.baseCat === 'CUSTOMIZE ORDER' && !order.rawNames
-    );
+    return orders.filter(order => {
+      const hasPlanned1 = order.planned1 !== undefined && order.planned1 !== null && order.planned1.toString().trim() !== '';
+      const hasActual1 = order.actual1 !== undefined && order.actual1 !== null && order.actual1.toString().trim() !== '';
+      return hasPlanned1 && !hasActual1;
+    });
   }, [orders]);
 
   // Compile active godowns for the filter dropdown based on all pending custom orders
@@ -93,34 +167,6 @@ export default function FullKitting() {
       return true;
     });
   }, [pendingOrders, godown, searchQuery]);
-
-  // Compile kitting history records from sheet orders that have costing card details
-  const kittingHistory = useMemo(() => {
-    return orders
-      .filter(o => o.baseCat === 'CUSTOMIZE ORDER' && o.rawNames)
-      .map(o => ({
-        id: `kh-${o.sNo}`,
-        sNo: o.sNo,
-        timestamp: o.timestamp,
-        productCode: o.productCode,
-        productName: o.productName,
-        baseCat: o.baseCat,
-        qty: o.qty,
-        rawNames: o.rawNames,
-        rawQuantities: o.rawQuantities,
-        fgAvailableQty: o.fgAvailableQty,
-        totalRawRequiredQty: o.totalRawRequiredQty,
-        totalRawCost: o.totalRawCost,
-        extraAmount: o.extraAmount,
-        totalProductionCost: o.totalProductionCost,
-        sellingPrice: o.sellingPrice,
-        profitLoss: o.profitLoss,
-        profitLossPercent: o.profitLossPercent,
-        costingImage: o.costingImage,
-        status: o.checkJc || 'Pending',
-        jobCardNo: o.checkJc?.startsWith('JC-') ? o.checkJc : ''
-      }));
-  }, [orders]);
 
   // Apply search/filtering for history records
   const filteredHistory = useMemo(() => {
@@ -155,35 +201,58 @@ export default function FullKitting() {
     setIsFormOpen(true);
   };
 
-  const handleSaveKittingRecord = async (orderId, historyRecord) => {
-    const sNos = Array.isArray(orderId) ? orderId : [orderId];
-
+  const handleSaveKittingRecord = async (records) => {
     const loadToast = toast.loading('Saving costing check to Google Sheets...');
     try {
-      const result = await productionAPI.updateKittingData(sNos, {
-        rawNames: historyRecord.rawNames,
-        rawQuantities: historyRecord.rawQuantities,
-        fgAvailableQty: historyRecord.fgAvailableQty,
-        totalRawRequiredQty: historyRecord.totalRawRequiredQty,
-        totalRawCost: historyRecord.totalRawCost,
-        extraAmount: historyRecord.extraAmount,
-        totalProductionCost: historyRecord.totalProductionCost,
-        sellingPrice: historyRecord.sellingPrice,
-        profitLoss: historyRecord.profitLoss,
-        profitLossPercent: historyRecord.profitLossPercent,
-        costingImage: historyRecord.costingImage
-      });
+      const historyResult = await productionAPI.getSheetData('Costing-History');
+      const historyRecords = historyResult.success ? historyResult.records : [];
 
-      if (result.success) {
-        toast.success('Costing card saved successfully!', { id: loadToast });
-        setIsFormOpen(false);
-        await fetchOrders();
-      } else {
-        toast.error(`Failed to save costing card: ${result.error}`, { id: loadToast });
+      const timestamp = formatDate(new Date());
+
+      for (const record of records) {
+        const sNo = record.sNo?.toString().trim();
+        const matched = historyRecords.find(r => r.sNo?.toString().trim() === sNo);
+
+        const rowData = [
+          timestamp,
+          record.costingData.kittingTicket || '',
+          sNo,
+          record.costingData.fgName || '',
+          record.costingData.planQty || '0',
+          record.costingData.requiredRawMaterialName || '',
+          record.costingData.rawQty || '',
+          record.costingData.rawCost || '',
+          record.costingData.availableRawQty || '',
+          record.costingData.indentQty || '',
+          record.costingData.fgAvailableQty || '0',
+          record.costingData.totalRawRequiredQty || '0',
+          record.costingData.totalRawCost || '0',
+          record.costingData.extraAmount || '0',
+          record.costingData.totalProductionCost || '0',
+          record.costingData.sellingPrice || '0',
+          record.costingData.profitLoss || '0',
+          record.costingData.profitLossPercent || '0',
+          record.costingData.pdfLink || ''
+        ];
+
+        let result;
+        if (matched) {
+          result = await productionAPI.updateRow('Costing-History', matched.rowIndex, rowData);
+        } else {
+          result = await productionAPI.insertRow('Costing-History', rowData);
+        }
+
+        if (!result.success) {
+          throw new Error(result.error || `Failed to save S NO ${sNo}`);
+        }
       }
+
+      toast.success('Costing card saved successfully!', { id: loadToast });
+      setIsFormOpen(false);
+      await fetchOrders();
     } catch (err) {
       console.error(err);
-      toast.error('Failed to save costing card to sheet.', { id: loadToast });
+      toast.error(`Failed to save costing card: ${err.message}`, { id: loadToast });
     }
   };
 
@@ -196,13 +265,20 @@ export default function FullKitting() {
 
       const loadToast = toast.loading('Reverting costing card from Google Sheets...');
       try {
-        const result = await productionAPI.clearKittingData(sNos);
-        if (result.success) {
-          toast.success('Record reverted to pending successfully!', { id: loadToast });
-          await fetchOrders();
-        } else {
-          toast.error(`Failed to revert record: ${result.error}`, { id: loadToast });
+        const historyResult = await productionAPI.getSheetData('Costing-History');
+        if (historyResult.success && historyResult.records) {
+          const matches = historyResult.records
+            .filter(r => sNos.includes(Number(r.sNo)))
+            .map(r => r.rowIndex);
+
+          matches.sort((a, b) => b - a);
+          for (const rowIndex of matches) {
+            await productionAPI.deleteRow('Costing-History', rowIndex);
+          }
         }
+
+        toast.success('Record reverted to pending successfully!', { id: loadToast });
+        await fetchOrders();
       } catch (err) {
         console.error(err);
         toast.error('Failed to revert costing card.', { id: loadToast });
@@ -270,6 +346,12 @@ export default function FullKitting() {
             <RotateCcw size={15} />
           </button>
 
+          <ColumnToggle
+            headers={activeTab === 'pending' ? pendingToggleableHeaders : historyToggleableHeaders}
+            visibleColumns={visibleColumns}
+            onToggleColumn={handleToggleColumn}
+          />
+
           {/* Full Kitting Button */}
           <button
             onClick={() => handleOpenKittingForm('')}
@@ -285,19 +367,21 @@ export default function FullKitting() {
       {/* Main Tab Views */}
       <div className="flex-1 min-h-0">
         {activeTab === 'pending' ? (
-          <KittingPending 
-            data={filteredPendingOrders} 
+          <KittingPending
+            data={filteredPendingOrders}
+            visibleColumns={visibleColumns}
           />
         ) : (
-          <KittingHistory 
-            data={filteredHistory} 
+          <KittingHistory
+            data={filteredHistory}
             onDeleteHistory={handleDeleteHistory}
+            visibleColumns={visibleColumns}
           />
         )}
       </div>
 
       {/* Shared Costing Form Modal */}
-      <FullKittingForm 
+      <FullKittingForm
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
         onSave={handleSaveKittingRecord}

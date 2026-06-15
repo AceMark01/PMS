@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import DataTable from '../../components/DataTable';
 import { Trash2 } from 'lucide-react';
 
-export default function KittingHistory({ data, onDeleteHistory }) {
+export default function KittingHistory({ data, onDeleteHistory, visibleColumns = [] }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
 
@@ -12,8 +12,9 @@ export default function KittingHistory({ data, onDeleteHistory }) {
     currentPage * itemsPerPage
   );
 
-  const tableHeaders = [
+  const allHeaders = [
     "Action",
+    "Ticket ID",
     "S NO",
     "Timestamp",
     "Product code",
@@ -33,6 +34,8 @@ export default function KittingHistory({ data, onDeleteHistory }) {
     "Costing Image"
   ];
 
+  const tableHeaders = allHeaders.filter(h => h === 'Action' || visibleColumns.includes(h));
+
   const renderRow = (item, idx) => {
     const isProfit = item.profitLoss >= 0;
     return (
@@ -46,6 +49,10 @@ export default function KittingHistory({ data, onDeleteHistory }) {
           >
             <Trash2 size={15} />
           </button>
+        </td>
+        {/* Ticket ID */}
+        <td className="px-4 py-3 text-center text-xs text-indigo-700 font-bold whitespace-nowrap">
+          {item.kittingTicket || 'N/A'}
         </td>
         {/* S NO */}
         <td className="px-4 py-3 text-center text-xs text-gray-600 font-semibold">{item.sNo}</td>
@@ -123,6 +130,10 @@ export default function KittingHistory({ data, onDeleteHistory }) {
 
         <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 text-[11px] bg-slate-50 rounded-lg p-2.5 border border-slate-100/50">
           <div>
+            <span className="text-gray-400 block uppercase text-[8px] tracking-tight">Ticket ID</span>
+            <span className="text-indigo-700 font-black">{item.kittingTicket || 'N/A'}</span>
+          </div>
+          <div>
             <span className="text-gray-400 block uppercase text-[8px] tracking-tight">Timestamp</span>
             <span className="text-gray-700 font-medium">{item.timestamp}</span>
           </div>
@@ -167,6 +178,8 @@ export default function KittingHistory({ data, onDeleteHistory }) {
       <div className="flex-1 min-h-0 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
         <DataTable
           headers={tableHeaders}
+          allHeaders={allHeaders}
+          visibleColumns={visibleColumns}
           data={paginatedHistory}
           renderRow={renderRow}
           renderCard={renderCard}

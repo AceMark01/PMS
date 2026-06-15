@@ -4,6 +4,7 @@ import { Plus, Search, RotateCcw, Filter, Trash2, Edit2, Layers, Tag, Box, Dolla
 import DataTable from '../../components/DataTable';
 import ModalForm from '../../components/ModalForm';
 import SearchableDropdown from '../../components/SearchableDropdown';
+import ColumnToggle from '../../components/ColumnToggle';
 import { SEEDED_ITEMS } from '../../utils/seeds';
 import { productionAPI } from '../../services/api';
 
@@ -22,9 +23,16 @@ export default function BOM() {
   const fetchBOM = async () => {
     setLoading(true);
     try {
-      const result = await productionAPI.getBOM();
+      const result = await productionAPI.getSheetData('BOM');
       if (result.success) {
-        setMaterials(result.records);
+        setMaterials(result.records.map(r => ({
+          ...r,
+          qty: Number(r.qty) || 0,
+          costPerUnit: Number(r.costPerUnit) || 0,
+          totalCost: (Number(r.qty) || 0) * (Number(r.costPerUnit) || 0),
+          batchQty: Number(r.batchQty) || 0,
+          qtyFromRaw: Number(r.qtyFromRaw) || 0
+        })));
       } else {
         toast.error(`Failed to fetch BOM: ${result.error}`);
       }
@@ -56,6 +64,22 @@ export default function BOM() {
 
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
+
+  const allHeaders = useMemo(() => [
+    "Product Name", "FG Code", "Raw Item Name", "Item Code", "Unit", "Quantity (J/I)", "Cost Per Unit", "Total Cost", "Batch Qty", "Qty(From Raw Material)"
+  ], []);
+
+  const [visibleColumns, setVisibleColumns] = useState([
+    "Product Name", "FG Code", "Raw Item Name", "Item Code", "Unit", "Quantity (J/I)", "Cost Per Unit", "Total Cost", "Batch Qty", "Qty(From Raw Material)"
+  ]);
+
+  const handleToggleColumn = (columnName) => {
+    setVisibleColumns(prev => 
+      prev.includes(columnName)
+        ? prev.filter(c => c !== columnName)
+        : [...prev, columnName]
+    );
+  };
 
   const handleClearFilters = () => {
     setFilters({
@@ -115,7 +139,7 @@ export default function BOM() {
     if (confirm('Are you sure you want to delete this raw material record?')) {
       const loadToast = toast.loading('Deleting BOM record from Google Sheets...');
       try {
-        const result = await productionAPI.deleteBOM(item.rowIndex);
+        const result = await productionAPI.deleteRow('BOM', item.rowIndex);
         if (result.success) {
           toast.success('Record deleted successfully!', { id: loadToast });
           await fetchBOM();
@@ -171,17 +195,20 @@ export default function BOM() {
       if (isEditMode && editingRowIndex) {
         // Edit mode: update single record
         const row = rawItems[0];
-        const result = await productionAPI.updateBOM(editingRowIndex, {
-          productName: selectedProductName,
-          fgCode: selectedFGCode,
-          rawItemName: row.rawItemName,
-          itemCode: row.itemCode,
-          unit: row.unit,
-          qty: Number(row.qty),
-          costPerUnit: Number(row.costPerUnit),
-          batchQty: Number(row.batchQty) || 0,
-          qtyFromRaw: Number(row.qtyFromRaw) || 0
-        });
+        const rowData = [
+          selectedProductName,
+          selectedFGCode,
+          row.rawItemName,
+          row.itemCode,
+          row.unit,
+          Number(row.qty),
+          Number(row.costPerUnit),
+          Number(row.qty) * Number(row.costPerUnit),
+          Number(row.batchQty) || 0,
+          Number(row.qtyFromRaw) || 0
+        ];
+
+        const result = await productionAPI.updateRow('BOM', editingRowIndex, rowData);
 
         if (result.success) {
           toast.success('BOM record updated successfully!', { id: loadToast });
@@ -192,19 +219,21 @@ export default function BOM() {
         }
       } else {
         // Add mode: save multiple records
-        const promises = rawItems.map(row =>
-          productionAPI.addBOM({
-            productName: selectedProductName,
-            fgCode: selectedFGCode,
-            rawItemName: row.rawItemName,
-            itemCode: row.itemCode,
-            unit: row.unit,
-            qty: Number(row.qty),
-            costPerUnit: Number(row.costPerUnit),
-            batchQty: Number(row.batchQty) || 0,
-            qtyFromRaw: Number(row.qtyFromRaw) || 0
-          })
-        );
+        const promises = rawItems.map(row => {
+          const rowData = [
+            selectedProductName,
+            selectedFGCode,
+            row.rawItemName,
+            row.itemCode,
+            row.unit,
+            Number(row.qty),
+            Number(row.costPerUnit),
+            Number(row.qty) * Number(row.costPerUnit),
+            Number(row.batchQty) || 0,
+            Number(row.qtyFromRaw) || 0
+          ];
+          return productionAPI.insertRow('BOM', rowData);
+        });
 
         const results = await Promise.all(promises);
         const failed = results.filter(r => !r.success);
@@ -268,31 +297,12 @@ export default function BOM() {
     );
   }
 
-  const tableHeaders = [
-    "Action", "Product Name", "FG Code", "Raw Item Name", "Item Code", "Unit", "Quantity (J/I)", "Cost Per Unit", "Total Cost", "Batch Qty", "Qty(From Raw Material)"
-  ];
+  const tableHeaders = allHeaders.filter(h => visibleColumns.includes(h));
 
   const renderRow = (item, idx) => {
     return (
       <tr key={item.id || idx} className="hover:bg-indigo-50/30 transition-colors border-b border-gray-100 text-xs">
-        <td className="px-4 py-3 text-center whitespace-nowrap">
-          <div className="flex justify-center gap-1.5">
-            <button
-              onClick={() => handleEditClick(item)}
-              className="p-1 text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700 rounded transition active:scale-95"
-              title="Edit Details"
-            >
-              <Edit2 size={14} />
-            </button>
-            <button
-              onClick={() => handleDelete(item)}
-              className="p-1 text-red-600 hover:bg-red-50 hover:text-red-700 rounded transition active:scale-95"
-              title="Delete Record"
-            >
-              <Trash2 size={14} />
-            </button>
-          </div>
-        </td>
+
         <td className="px-4 py-3 text-center font-semibold text-gray-900 whitespace-nowrap uppercase">{item.productName}</td>
         <td className="px-4 py-3 text-center text-indigo-600 font-bold whitespace-nowrap">{item.fgCode || '-'}</td>
         <td className="px-4 py-3 text-center text-gray-900 whitespace-nowrap uppercase font-medium">{item.rawItemName}</td>
@@ -439,6 +449,12 @@ export default function BOM() {
               <RotateCcw size={16} />
             </button>
 
+            <ColumnToggle
+              headers={allHeaders}
+              visibleColumns={visibleColumns}
+              onToggleColumn={handleToggleColumn}
+            />
+
           </div>
         </div>
 
@@ -456,6 +472,8 @@ export default function BOM() {
       <div className="flex-1 min-h-0 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
         <DataTable
           headers={tableHeaders}
+          allHeaders={allHeaders}
+          visibleColumns={visibleColumns}
           data={paginatedMaterials}
           renderRow={renderRow}
           renderCard={renderCard}

@@ -2,6 +2,14 @@ import React, { useState, useEffect, useMemo } from 'react';
 import ModalForm from '../../components/ModalForm';
 import { Calendar, Tag, ShieldCheck, FileText, Plus, X } from 'lucide-react';
 
+const formatDate = (date) => {
+  if (!date) return '';
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+};
+
 export default function ActualProductionForm({ isOpen, onClose, onSubmitProduction, record, bomRecords, inventoryRecords }) {
   const [dateOfProduction, setDateOfProduction] = useState('');
   const [editedRaws, setEditedRaws] = useState([]);
@@ -93,16 +101,11 @@ export default function ActualProductionForm({ isOpen, onClose, onSubmitProducti
     // Construct the production record mapping exactly to the 10 raw names and quantities schema
     const productionRecord = {
       id: `ap-${Date.now()}`,
-      timestamp: new Date().toLocaleString('en-IN', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: true
-      }),
+      timestamp: formatDate(new Date()),
       jobCardNo: record.jobCardNo || `JC-${record.sNo}`,
+      jCJobCard: record.jobCardNo || `JC-${record.sNo}`,
+      'jC-JobCard': record.jobCardNo || `JC-${record.sNo}`,
+      jcJobCard: record.jobCardNo || `JC-${record.sNo}`,
       sNo: record.sNo,
       productCode: record.productCode,
       productName: record.productName,

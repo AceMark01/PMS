@@ -1,19 +1,15 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import toast from 'react-hot-toast';
-import { Search, Plus, RotateCcw, Filter, Trash2 } from 'lucide-react';
+import { Search, RotateCcw, Filter } from 'lucide-react';
 import DataTable from '../../components/DataTable';
 import SearchableDropdown from '../../components/SearchableDropdown';
-import AddOrder from './AddOrder';
+import ColumnToggle from '../../components/ColumnToggle';
 import { productionAPI } from '../../services/api';
 
 export default function OrderDetails() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [masterItems, setMasterItems] = useState([]);
-  const [loadingMasterItems, setLoadingMasterItems] = useState(true);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
   // Filters State
@@ -26,10 +22,51 @@ export default function OrderDetails() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
 
+  const allHeaders = useMemo(() => [
+    "Timestamp", 
+    "S NO", 
+    "ProductCode", 
+    "ProductName", 
+    "BaseCat", 
+    "Order Quantity", 
+    "Godown",
+    "Order Cancel (Pre-Closed)",
+    "Actual Production Planned",
+    "Actual Production Done",
+    "Planning Pending Qty",
+    "Production Pending Qty",
+    "Date Of Complete Planning",
+    "Date Of Complete Production"
+  ], []);
+
+  const [visibleColumns, setVisibleColumns] = useState([
+    "Timestamp", 
+    "S NO", 
+    "ProductCode", 
+    "ProductName", 
+    "BaseCat", 
+    "Order Quantity", 
+    "Godown",
+    "Order Cancel (Pre-Closed)",
+    "Actual Production Planned",
+    "Actual Production Done",
+    "Planning Pending Qty",
+    "Production Pending Qty",
+    "Date Of Complete Planning",
+    "Date Of Complete Production"
+  ]);
+
+  const handleToggleColumn = (columnName) => {
+    setVisibleColumns(prev => 
+      prev.includes(columnName)
+        ? prev.filter(c => c !== columnName)
+        : [...prev, columnName]
+    );
+  };
+
   // Fetch orders from Google Sheet API on component mount
   useEffect(() => {
     fetchOrders();
-    fetchMasterItems();
   }, []);
 
   const fetchOrders = async () => {
@@ -37,20 +74,30 @@ export default function OrderDetails() {
     setError(null);
 
     try {
-      const result = await productionAPI.getProductionOrders();
+      const result = await productionAPI.getSheetData('PRODUCTION_ORDERS', { headerRow: 6 });
 
       if (result.success) {
         // Transform the data to match your frontend structure
-        const transformedOrders = result.orders.map(order => ({
-          id: order.sNo?.toString() || `po-${order.sNo}`,
-          sNo: order.sNo,
-          timestamp: order.timestamp,
-          productCode: order.productCode || '',
-          productName: order.productName || '',
-          baseCat: order.baseCat || '',
-          qty: order.qty || '',
-          godown: order.godown || ''
-        }));
+        const transformedOrders = result.records
+          .filter(order => order.sNo || order.productCode || order.productName)
+          .map(order => ({
+            id: order.rowIndex.toString(),
+            sNo: order.sNo || '',
+            timestamp: order.timestamp || '',
+            productCode: order.productCode || '',
+            productName: order.productName || '',
+            baseCat: order.baseCat || '',
+            qty: order.qty || '',
+            godown: order.godown || '',
+            orderCancel: order.orderCancel || '',
+            actualProductionPlanned: order.actualProductionPlanned || '',
+            actualProductionDone: order.actualProductionDone || '',
+            planningPendingQty: order.planningPendingQty || '',
+            productionPendingQty: order.productionPendingQty || '',
+            dateOfCompletePlanning: order.dateOfCompletePlanning || '',
+            dateOfCompleteProduction: order.dateOfCompleteProduction || '',
+            rowIndex: order.rowIndex
+          }));
 
         setOrders(transformedOrders);
       } else {
@@ -66,60 +113,6 @@ export default function OrderDetails() {
     }
   };
 
-  const fetchMasterItems = async () => {
-    setLoadingMasterItems(true);
-
-    try {
-      // If you have a dedicated endpoint for master items, use it
-      // Otherwise, extract unique items from orders or keep using seeds
-      // For now, we'll fetch master items from the API if available
-      // You can add a getMasterItems function to your productionAPI
-
-      // Fallback: Extract unique product info from orders once loaded
-      // But since orders load async, we'll initially use empty array
-      // and update when orders are loaded
-      setMasterItems([]);
-
-      // If you have a separate API endpoint for master items:
-      // const result = await productionAPI.getMasterItems();
-      // if (result.success) {
-      //   setMasterItems(result.items);
-      // }
-    } catch (error) {
-      console.error('Error fetching master items:', error);
-    } finally {
-      setLoadingMasterItems(false);
-    }
-  };
-
-  // Update master items when orders are loaded (extract unique product info)
-  useEffect(() => {
-    if (orders.length > 0) {
-      // Extract unique product combinations from orders
-      const uniqueProducts = new Map();
-
-      orders.forEach(order => {
-        const key = `${order.productCode}|${order.productName}`;
-        if (!uniqueProducts.has(key) && order.productCode && order.productName) {
-          uniqueProducts.set(key, {
-            code: order.productCode,
-            name: order.productName,
-            baseCat: order.baseCat
-          });
-        }
-      });
-
-      const items = Array.from(uniqueProducts.values()).map(item => ({
-        id: item.code,
-        code: item.code,
-        name: item.name,
-        category: item.baseCat
-      }));
-
-      setMasterItems(items);
-    }
-  }, [orders]);
-
   const handleClearFilters = () => {
     setFilters({
       searchQuery: '',
@@ -130,72 +123,6 @@ export default function OrderDetails() {
     toast.success('Filters cleared');
   };
 
-  const handleCreateOrder = async (newOrder) => {
-    setIsSubmitting(true);
-
-    try {
-      const formatTimestamp = () => {
-        const now = new Date();
-        const pad = (n) => String(n).padStart(2, '0');
-        return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-      };
-
-      const orderData = {
-        timestamp: formatTimestamp(),
-        sNo: null, // Let backend auto-generate
-        productCode: newOrder.productCode,
-        productName: newOrder.productName,
-        baseCat: newOrder.baseCat,
-        qty: parseFloat(newOrder.qty),
-        godown: newOrder.godown
-      };
-
-      const result = await productionAPI.addProductionOrder(orderData);
-
-      if (result.success) {
-        toast.success('Production Order created successfully!');
-        setShowAddModal(false);
-
-        // Refresh orders list from API
-        await fetchOrders();
-      } else {
-        toast.error(`Failed to create order: ${result.error}`);
-      }
-    } catch (error) {
-      console.error('Error creating order:', error);
-      toast.error('Failed to create production order');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleDeleteOrder = async (id) => {
-    if (!confirm('Are you sure you want to cancel/delete this production order?')) {
-      return;
-    }
-
-    try {
-      // Find the order to get its S NO
-      const orderToDelete = orders.find(o => o.id === id);
-      if (!orderToDelete) {
-        toast.error('Order not found');
-        return;
-      }
-
-      const result = await productionAPI.deleteProductionOrder(orderToDelete.sNo);
-
-      if (result.success) {
-        toast.success('Production Order cancelled/deleted.');
-        // Refresh orders list from API
-        await fetchOrders();
-      } else {
-        toast.error(`Failed to delete order: ${result.error}`);
-      }
-    } catch (error) {
-      console.error('Error deleting order:', error);
-      toast.error('Failed to delete production order');
-    }
-  };
 
   // Compile active categories and godowns for filters from API data
   const categoriesList = useMemo(() => {
@@ -222,7 +149,7 @@ export default function OrderDetails() {
         );
       }
       return true;
-    }).reverse(); // Show latest orders first
+    }).sort((a, b) => Number(a.sNo || 0) - Number(b.sNo || 0)); // Sort by serial no in ascending order
   }, [orders, filters]);
 
   const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
@@ -231,29 +158,25 @@ export default function OrderDetails() {
     currentPage * itemsPerPage
   );
 
-  const tableHeaders = [
-    "Action", "S NO", "Timestamp", "Product Code", "Product Name", "Base Cat", "Order Quantity", "Godown"
-  ];
+  const tableHeaders = allHeaders.filter(h => visibleColumns.includes(h));
 
   const renderRow = (item, idx) => {
     return (
       <tr key={item.id || idx} className="hover:bg-indigo-50/30 transition-colors border-b border-gray-100">
-        <td className="px-4 py-3 text-center whitespace-nowrap text-xs">
-          <button
-            onClick={() => handleDeleteOrder(item.id)}
-            className="p-1 text-red-600 hover:bg-red-50 hover:text-red-700 rounded transition-all active:scale-95 inline-flex items-center justify-center"
-            title="Cancel/Delete Order"
-          >
-            <Trash2 size={15} />
-          </button>
-        </td>
-        <td className="px-4 py-3 text-center text-xs text-gray-600 whitespace-nowrap">{item.sNo}</td>
         <td className="px-4 py-3 text-center text-xs text-gray-500 whitespace-nowrap">{item.timestamp}</td>
+        <td className="px-4 py-3 text-center text-xs text-gray-600 whitespace-nowrap">{item.sNo}</td>
         <td className="px-4 py-3 text-center text-xs text-indigo-600 font-bold whitespace-nowrap">{item.productCode}</td>
         <td className="px-4 py-3 text-center text-xs font-semibold text-gray-900 whitespace-nowrap uppercase">{item.productName}</td>
         <td className="px-4 py-3 text-center text-[11px] text-gray-600 whitespace-nowrap">{item.baseCat}</td>
         <td className="px-4 py-3 text-center text-xs text-indigo-600 font-bold whitespace-nowrap">{item.qty}</td>
         <td className="px-4 py-3 text-center text-xs text-slate-700 font-medium whitespace-nowrap">{item.godown}</td>
+        <td className="px-4 py-3 text-center text-xs text-rose-600 font-bold whitespace-nowrap">{item.orderCancel || '-'}</td>
+        <td className="px-4 py-3 text-center text-xs text-slate-700 font-semibold whitespace-nowrap">{item.actualProductionPlanned || '-'}</td>
+        <td className="px-4 py-3 text-center text-xs text-slate-700 font-semibold whitespace-nowrap">{item.actualProductionDone || '-'}</td>
+        <td className="px-4 py-3 text-center text-xs text-slate-700 font-semibold whitespace-nowrap">{item.planningPendingQty || '-'}</td>
+        <td className="px-4 py-3 text-center text-xs text-slate-700 font-semibold whitespace-nowrap">{item.productionPendingQty || '-'}</td>
+        <td className="px-4 py-3 text-center text-xs text-slate-600 whitespace-nowrap">{item.dateOfCompletePlanning || '-'}</td>
+        <td className="px-4 py-3 text-center text-xs text-slate-600 whitespace-nowrap">{item.dateOfCompleteProduction || '-'}</td>
       </tr>
     );
   };
@@ -268,13 +191,6 @@ export default function OrderDetails() {
             </span>
             <span className="text-xs font-bold text-gray-900 uppercase">{item.productName}</span>
           </div>
-          <button
-            onClick={() => handleDeleteOrder(item.id)}
-            className="p-1 text-red-600 hover:bg-red-50 hover:text-red-700 rounded transition"
-            title="Cancel/Delete Order"
-          >
-            <Trash2 size={14} />
-          </button>
         </div>
 
         <div className="grid grid-cols-2 gap-2 text-[11px] bg-slate-50 rounded-lg p-2 border border-slate-100/50">
@@ -337,7 +253,7 @@ export default function OrderDetails() {
   return (
     <div className="p-0 sm:p-2 md:p-6 space-y-2 md:space-y-6 flex flex-col h-full min-h-0">
 
-      {/* Header Filters & Add Button */}
+      {/* Header Filters */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-2 lg:gap-4 w-full px-2 sm:px-0">
         <div className="flex flex-col lg:flex-row w-full gap-2 lg:gap-3 items-center">
 
@@ -360,15 +276,6 @@ export default function OrderDetails() {
             >
               <Filter size={14} />
             </button>
-            {!showMobileFilters && (
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="lg:hidden flex items-center justify-center bg-indigo-600 text-white rounded-lg h-[32px] w-[32px] flex-shrink-0 shadow-sm active:scale-95"
-                title="Add Order"
-              >
-                <Plus size={16} />
-              </button>
-            )}
             <button
               onClick={handleClearFilters}
               className="lg:hidden flex items-center justify-center bg-gray-50 text-gray-500 border border-gray-200 rounded-lg h-[32px] w-[32px] flex-shrink-0 shadow-sm active:scale-95"
@@ -415,18 +322,14 @@ export default function OrderDetails() {
               <RotateCcw size={16} />
             </button>
 
+            <ColumnToggle
+              headers={allHeaders}
+              visibleColumns={visibleColumns}
+              onToggleColumn={handleToggleColumn}
+            />
+
           </div>
         </div>
-
-        {/* Desktop Add Button */}
-        <button
-          onClick={() => setShowAddModal(true)}
-          disabled={isSubmitting}
-          className="hidden lg:flex bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg items-center justify-center transition shadow-sm w-[38px] h-[38px] flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-          title="Create Production Order"
-        >
-          <Plus size={18} />
-        </button>
       </div>
 
       {/* Stats Bar */}
@@ -440,10 +343,12 @@ export default function OrderDetails() {
       <div className="flex-1 min-h-0 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
         <DataTable
           headers={tableHeaders}
+          allHeaders={allHeaders}
+          visibleColumns={visibleColumns}
           data={paginatedOrders}
           renderRow={renderRow}
           renderCard={renderCard}
-          minWidth="1100px"
+          minWidth="2200px"
           currentPage={currentPage}
           totalPages={totalPages}
           itemsPerPage={itemsPerPage}
@@ -453,15 +358,6 @@ export default function OrderDetails() {
           itemsPerPageOptions={[50, 100, 200, 500, 1000]}
         />
       </div>
-
-      {/* Add Order Popup Modal Component */}
-      <AddOrder
-        isOpen={showAddModal}
-        onClose={() => setShowAddModal(false)}
-        onSave={handleCreateOrder}
-        masterItems={masterItems}
-        isSubmitting={isSubmitting}
-      />
 
     </div>
   );

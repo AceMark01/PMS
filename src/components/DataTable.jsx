@@ -9,6 +9,8 @@ import DragScrollTable from './DragScrollTable';
  */
 const DataTable = ({ 
   headers, 
+  allHeaders,
+  visibleColumns,
   data, 
   renderRow, 
   renderCard,
@@ -52,7 +54,19 @@ const DataTable = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 bg-white">
-              {data.map((item, index) => renderRow(item, index))}
+              {data.map((item, index) => {
+                const rowElement = renderRow(item, index);
+                if (allHeaders && visibleColumns && rowElement && rowElement.props && rowElement.props.children) {
+                  const childrenArray = React.Children.toArray(rowElement.props.children);
+                  const filteredChildren = childrenArray.filter((child, childIdx) => {
+                    const headerName = allHeaders[childIdx];
+                    if (headerName === 'Action') return true;
+                    return visibleColumns.includes(headerName);
+                  });
+                  return React.cloneElement(rowElement, { key: rowElement.key || index }, filteredChildren);
+                }
+                return rowElement;
+              })}
             </tbody>
           </table>
         </DragScrollTable>

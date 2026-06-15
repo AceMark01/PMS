@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import DataTable from '../../components/DataTable';
 
-export default function KittingPending({ data }) {
+export default function KittingPending({ data, visibleColumns = [] }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
 
@@ -11,15 +11,17 @@ export default function KittingPending({ data }) {
     currentPage * itemsPerPage
   );
 
-  const tableHeaders = [
+  const allHeaders = [
     "S NO", "Timestamp", "Product code", "Product Name", "BAse Cat", "Order Quantity", "GoDown"
   ];
+
+  const tableHeaders = allHeaders.filter(h => visibleColumns.includes(h));
 
   const renderRow = (item, idx) => {
     return (
       <tr key={item.id || idx} className="hover:bg-indigo-50/30 transition-colors border-b border-gray-100">
         <td className="px-4 py-3 text-center text-xs text-gray-600 whitespace-nowrap">{item.sNo}</td>
-        <td className="px-4 py-3 text-center text-xs text-gray-500 whitespace-nowrap">{item.timestamp}</td>
+        <td className="px-4 py-3 text-center text-xs text-gray-505 text-gray-500 whitespace-nowrap">{item.timestamp}</td>
         <td className="px-4 py-3 text-center text-xs text-indigo-600 font-bold whitespace-nowrap">{item.productCode}</td>
         <td className="px-4 py-3 text-center text-xs font-semibold text-gray-900 whitespace-nowrap uppercase">{item.productName}</td>
         <td className="px-4 py-3 text-center text-[11px] text-gray-600 whitespace-nowrap">{item.baseCat}</td>
@@ -74,6 +76,8 @@ export default function KittingPending({ data }) {
       <div className="flex-1 min-h-0 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
         <DataTable
           headers={tableHeaders}
+          allHeaders={allHeaders}
+          visibleColumns={visibleColumns}
           data={paginatedOrders}
           renderRow={renderRow}
           renderCard={renderCard}

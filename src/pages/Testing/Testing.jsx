@@ -4,18 +4,55 @@ import { ClipboardCheck, CheckCircle, History, Search, RotateCcw } from 'lucide-
 import TestingPending from './TestingPending';
 import TestingApproval from './TestingApproval';
 import TestingForm from './TestingForm';
+import ColumnToggle from '../../components/ColumnToggle';
 import { TabSwitcher } from '../../components/StandardButtons';
 import { productionAPI } from '../../services/api';
+
+const formatDate = (date) => {
+  if (!date) return '';
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+};
 
 export default function Testing() {
   const [activeTab, setActiveTab] = useState('pending');
   const [loading, setLoading] = useState(true);
 
+  const pendingToggleableHeaders = useMemo(() => [
+    "Timestamp", "JC-Job Card", "S NO", "ProductCode", "ProductName", "Order Quantity", "Date Of Production", "Approval Status", "Approval Remarks",
+    "Raw Name1", "Raw Name2", "Raw Name3", "Raw Name4", "Raw Name5", "Raw Name6", "Raw Name7", "Raw Name8", "Raw Name9", "Raw Name10",
+    "Raw Qty1", "Raw Qty2", "Raw Qty3", "Raw Qty4", "Raw Qty5", "Raw Qty6", "Raw Qty7", "Raw Qty8", "Raw Qty9", "Raw Qty10"
+  ], []);
+
+  const historyToggleableHeaders = useMemo(() => [
+    "Timestamp", "JC-Job Card", "S NO", "ProductCode", "ProductName", "Order Quantity", "Date Of Production", "Testing Date", "Testing Status", "Testing Remarks",
+    "Raw Name1", "Raw Name2", "Raw Name3", "Raw Name4", "Raw Name5", "Raw Name6", "Raw Name7", "Raw Name8", "Raw Name9", "Raw Name10",
+    "Raw Qty1", "Raw Qty2", "Raw Qty3", "Raw Qty4", "Raw Qty5", "Raw Qty6", "Raw Qty7", "Raw Qty8", "Raw Qty9", "Raw Qty10"
+  ], []);
+
+  const [visibleColumns, setVisibleColumns] = useState([
+    "Timestamp", "JC-Job Card", "S NO", "ProductCode", "ProductName", "Order Quantity", "Date Of Production", "Approval Status", "Approval Remarks", "Testing Date", "Testing Status", "Testing Remarks",
+    "Raw Name1", "Raw Name2", "Raw Name3", "Raw Name4", "Raw Name5", "Raw Name6", "Raw Name7", "Raw Name8", "Raw Name9", "Raw Name10",
+    "Raw Qty1", "Raw Qty2", "Raw Qty3", "Raw Qty4", "Raw Qty5", "Raw Qty6", "Raw Qty7", "Raw Qty8", "Raw Qty9", "Raw Qty10"
+  ]);
+
+  const handleToggleColumn = (columnName) => {
+    setVisibleColumns(prev => 
+      prev.includes(columnName)
+        ? prev.filter(c => c !== columnName)
+        : [...prev, columnName]
+    );
+  };
+
+  // Load and manage job card logs (fetched from sheet)
+  const [jobCardHistory, setJobCardHistory] = useState([]);
+
   // Load and manage actual production logs (fetched from sheet)
   const [actualProductionHistory, setActualProductionHistory] = useState([]);
 
-  // Load and manage testing approval history logs
-  const [testingHistory, setTestingHistory] = useState([]);
+
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -24,22 +61,69 @@ export default function Testing() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [prodResult, testResult] = await Promise.all([
-        productionAPI.getActualProduction(),
-        productionAPI.getTestingHistory()
+      const [jobCardResult, prodResult] = await Promise.all([
+        productionAPI.getSheetData('JOB CARD', { headerRow: 6 }),
+        productionAPI.getSheetData('ACTUAL PRODUCTION', { headerRow: 6 })
       ]);
 
-      if (prodResult.success) {
-        setActualProductionHistory(prodResult.records || []);
+      if (jobCardResult.success) {
+        const transformedJobCards = jobCardResult.records.map(record => ({
+          id: record.rowIndex?.toString() || `jc-${record.sNo}`,
+          rowIndex: record.rowIndex,
+          jobCardNo: record.jCJobCard || record['jC-JobCard'] || record.jcJobCard || record.jobCardNo || '',
+          sNo: record.sNo,
+          timestamp: record.timestamp,
+          productCode: record.productCode || '',
+          productName: record.productName || '',
+          qty: Number(record.qty) || 0,
+          dateOfProduction: record.dateOfProduction || '',
+          status: record.approvalStatus || 'Approved',
+          remarks: record.approvalRemarks || '',
+          __rowValues: record.__rowValues
+        }));
+        setJobCardHistory(transformedJobCards);
       } else {
-        toast.error(`Failed to load actual production logs: ${prodResult.error}`);
+        toast.error(`Failed to load job cards from JOB CARD: ${jobCardResult.error}`);
       }
 
-      if (testResult.success) {
-        const records = testResult.records || [];
-        setTestingHistory(records);
+      if (prodResult.success) {
+        const transformedHistory = prodResult.records.map(record => ({
+          id: record.rowIndex?.toString() || `prod-${record.sNo}`,
+          rowIndex: record.rowIndex,
+          jobCardNo: record.jCJobCard || record['jC-JobCard'] || record.jcJobCard || record.jobCardNo || '',
+          sNo: record.sNo,
+          timestamp: record.timestamp,
+          productCode: record.productCode || '',
+          productName: record.productName || '',
+          qty: Number(record.qty) || 0,
+          dateOfProduction: record.dateOfProduction || '',
+          rawName1: record.rawName1 || '',
+          rawQty1: record.rawQty1 || '',
+          rawName2: record.rawName2 || '',
+          rawQty2: record.rawQty2 || '',
+          rawName3: record.rawName3 || '',
+          rawQty3: record.rawQty3 || '',
+          rawName4: record.rawName4 || '',
+          rawQty4: record.rawQty4 || '',
+          rawName5: record.rawName5 || '',
+          rawQty5: record.rawQty5 || '',
+          rawName6: record.rawName6 || '',
+          rawQty6: record.rawQty6 || '',
+          rawName7: record.rawName7 || '',
+          rawQty7: record.rawQty7 || '',
+          rawName8: record.rawName8 || '',
+          rawQty8: record.rawQty8 || '',
+          rawName9: record.rawName9 || '',
+          rawQty9: record.rawQty9 || '',
+          rawName10: record.rawName10 || '',
+          rawQty10: record.rawQty10 || '',
+          approvalStatus: record.approvalStatus || 'Approved',
+          approvalRemarks: record.approvalRemarks || '',
+          __rowValues: record.__rowValues
+        }));
+        setActualProductionHistory(transformedHistory);
       } else {
-        toast.error(`Failed to load testing history: ${testResult.error}`);
+        toast.error(`Failed to load actual production logs: ${prodResult.error}`);
       }
     } catch (err) {
       console.error(err);
@@ -53,11 +137,110 @@ export default function Testing() {
     fetchData();
   }, []);
 
-  // Filter actual production logs that are not yet tested
+  // Filter approved costing cards that are not yet in production history
   const pendingTesting = useMemo(() => {
-    const testedProdIds = new Set(testingHistory.map(t => t.productionRecordId));
-    return actualProductionHistory.filter(ap => !testedProdIds.has(ap.id));
-  }, [actualProductionHistory, testingHistory]);
+    const pendingJobCards = jobCardHistory.filter(row => {
+      const valAJ = row.__rowValues && row.__rowValues[35];
+      const hasAJ = valAJ !== undefined && valAJ !== null && valAJ.toString().trim() !== '';
+
+      const valAK = row.__rowValues && row.__rowValues[36];
+      const hasAK = valAK !== undefined && valAK !== null && valAK.toString().trim() !== '';
+
+      return hasAJ && !hasAK;
+    });
+
+    return pendingJobCards.map(jc => {
+      const firstSNo = String(jc.sNo).split(',')[0]?.trim();
+      const matchedProd = actualProductionHistory.find(
+        ap => String(ap.sNo).trim().split(',')[0]?.trim() === firstSNo
+      );
+
+      if (matchedProd) {
+        return {
+          ...matchedProd,
+        };
+      }
+
+      return {
+        id: jc.id,
+        rowIndex: jc.rowIndex,
+        jobCardNo: jc.jobCardNo,
+        sNo: jc.sNo,
+        timestamp: jc.timestamp,
+        productCode: jc.productCode,
+        productName: jc.productName,
+        qty: jc.qty,
+        dateOfProduction: jc.dateOfProduction,
+        approvalStatus: jc.status,
+        approvalRemarks: jc.remarks,
+        rawName1: '', rawQty1: '',
+        rawName2: '', rawQty2: '',
+        rawName3: '', rawQty3: '',
+        rawName4: '', rawQty4: '',
+        rawName5: '', rawQty5: '',
+        rawName6: '', rawQty6: '',
+        rawName7: '', rawQty7: '',
+        rawName8: '', rawQty8: '',
+        rawName9: '', rawQty9: '',
+        rawName10: '', rawQty10: '',
+      };
+    });
+  }, [jobCardHistory, actualProductionHistory]);
+
+  // Filter testing history logs directly from jobCardHistory
+  const testingHistory = useMemo(() => {
+    const historyJobCards = jobCardHistory.filter(row => {
+      const valAJ = row.__rowValues && row.__rowValues[35];
+      const hasAJ = valAJ !== undefined && valAJ !== null && valAJ.toString().trim() !== '';
+
+      const valAK = row.__rowValues && row.__rowValues[36];
+      const hasAK = valAK !== undefined && valAK !== null && valAK.toString().trim() !== '';
+
+      return hasAJ && hasAK;
+    });
+
+    return historyJobCards.map(jc => {
+      const firstSNo = String(jc.sNo).split(',')[0]?.trim();
+      const matchedProd = actualProductionHistory.find(
+        ap => String(ap.sNo).trim().split(',')[0]?.trim() === firstSNo
+      );
+
+      const actual2 = jc.__rowValues && jc.__rowValues[36];
+      const status2 = jc.__rowValues && jc.__rowValues[38];
+      const remarks = jc.__rowValues && jc.__rowValues[39];
+
+      const baseRecord = matchedProd || {
+        productCode: jc.productCode,
+        productName: jc.productName,
+        qty: jc.qty,
+        dateOfProduction: jc.dateOfProduction,
+        approvalStatus: jc.status,
+        approvalRemarks: jc.remarks,
+        rawName1: '', rawQty1: '',
+        rawName2: '', rawQty2: '',
+        rawName3: '', rawQty3: '',
+        rawName4: '', rawQty4: '',
+        rawName5: '', rawQty5: '',
+        rawName6: '', rawQty6: '',
+        rawName7: '', rawQty7: '',
+        rawName8: '', rawQty8: '',
+        rawName9: '', rawQty9: '',
+        rawName10: '', rawQty10: '',
+      };
+
+      return {
+        ...baseRecord,
+        id: jc.id,
+        rowIndex: jc.rowIndex,
+        jobCardNo: jc.jobCardNo,
+        sNo: jc.sNo,
+        timestamp: jc.timestamp,
+        testingDate: actual2 || '',
+        testingStatus: status2 || 'Approved',
+        testingRemarks: remarks || ''
+      };
+    });
+  }, [jobCardHistory, actualProductionHistory]);
 
   // Filter pending items by search query
   const filteredPending = useMemo(() => {
@@ -110,10 +293,40 @@ export default function Testing() {
     }
   };
 
-  const handleSubmitTesting = async (productionRecordId, testingRecord) => {
+  const handleSubmitTesting = async (recordId, testingRecord) => {
     setLoading(true);
     try {
-      const result = await productionAPI.addTestingHistory(testingRecord);
+      const jcRecord = jobCardHistory.find(jc => jc.id === recordId);
+      if (!jcRecord) {
+        toast.error('Job Card record not found');
+        return;
+      }
+
+      const newRowData = [...(jcRecord.__rowValues || [])];
+      while (newRowData.length < 40) {
+        newRowData.push('');
+      }
+
+      const actual2 = formatDate(new Date());
+      const planned2 = newRowData[35] || '';
+      
+      let delay = '';
+      if (planned2) {
+        const pDate = new Date(planned2);
+        const aDate = new Date(actual2);
+        if (!isNaN(pDate.getTime()) && !isNaN(aDate.getTime())) {
+          const diffMs = aDate - pDate;
+          const diffHrs = (diffMs / (1000 * 60 * 60)).toFixed(2);
+          delay = `${diffHrs} Hrs`;
+        }
+      }
+
+      newRowData[36] = actual2;
+      newRowData[37] = delay;
+      newRowData[38] = testingRecord.testingStatus;
+      newRowData[39] = testingRecord.testingRemarks || '';
+
+      const result = await productionAPI.updateRow('JOB CARD', jcRecord.rowIndex, newRowData);
       if (result.success) {
         toast.success(`Quality testing successfully submitted: ${testingRecord.testingStatus}!`);
         setIsFormOpen(false);
@@ -130,17 +343,28 @@ export default function Testing() {
   };
 
   const handleDeleteHistory = async (historyId) => {
-    const record = testingHistory.find(h => h.id === historyId);
-    if (!record) {
-      toast.error('Testing record not found');
+    const jcRecord = jobCardHistory.find(jc => jc.id === historyId);
+    if (!jcRecord) {
+      toast.error('Job Card record not found');
       return;
     }
     if (window.confirm('Are you sure you want to delete this testing record? This will revert the record back to Pending Testing.')) {
       setLoading(true);
       try {
-        const result = await productionAPI.deleteTestingHistory(record.sNo);
+        const newRowData = [...(jcRecord.__rowValues || [])];
+        while (newRowData.length < 40) {
+          newRowData.push('');
+        }
+
+        // Clear AK, AL, AM, AN (indices 36, 37, 38, 39)
+        newRowData[36] = '';
+        newRowData[37] = '';
+        newRowData[38] = '';
+        newRowData[39] = '';
+
+        const result = await productionAPI.updateRow('JOB CARD', jcRecord.rowIndex, newRowData);
         if (result.success) {
-          toast.success('Testing log deleted and job reverted back to pending testing.');
+          toast.success('Testing log cleared and job reverted back to pending testing.');
           await fetchData();
         } else {
           toast.error(`Failed to delete testing record: ${result.error}`);
@@ -197,6 +421,12 @@ export default function Testing() {
           >
             <RotateCcw size={15} />
           </button>
+
+          <ColumnToggle
+            headers={activeTab === 'pending' ? pendingToggleableHeaders : historyToggleableHeaders}
+            visibleColumns={visibleColumns}
+            onToggleColumn={handleToggleColumn}
+          />
         </div>
       </div>
 
@@ -206,11 +436,13 @@ export default function Testing() {
           <TestingPending
             data={filteredPending}
             onOpenTestingForm={handleOpenTestingForm}
+            visibleColumns={visibleColumns}
           />
         ) : (
           <TestingApproval
             data={filteredHistory}
             onDeleteHistory={handleDeleteHistory}
+            visibleColumns={visibleColumns}
           />
         )}
       </div>

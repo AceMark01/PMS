@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import DataTable from '../../components/DataTable';
 import { Play } from 'lucide-react';
 
-export default function TestingPending({ data, onOpenTestingForm }) {
+export default function TestingPending({ data, onOpenTestingForm, visibleColumns = [] }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
 
@@ -12,7 +12,7 @@ export default function TestingPending({ data, onOpenTestingForm }) {
     currentPage * itemsPerPage
   );
 
-  const tableHeaders = [
+  const allHeaders = [
     "Action",
     "Timestamp",
     "JC-Job Card",
@@ -44,6 +44,8 @@ export default function TestingPending({ data, onOpenTestingForm }) {
     "Raw Qty9",
     "Raw Qty10"
   ];
+
+  const tableHeaders = allHeaders.filter(h => h === 'Action' || visibleColumns.includes(h));
 
   const renderRow = (item, idx) => {
     return (
@@ -84,7 +86,7 @@ export default function TestingPending({ data, onOpenTestingForm }) {
           </span>
         </td>
         {/* Approval Remarks */}
-        <td className="px-4 py-3 text-center text-xs text-gray-500 min-w-[150px] whitespace-normal break-words">{item.approvalRemarks || '-'}</td>
+        <td className="px-4 py-3 text-center text-xs text-gray-505 min-w-[150px] whitespace-normal break-words">{item.approvalRemarks || '-'}</td>
         
         {/* Raw Names 1-10 */}
         <td className="px-4 py-3 text-center text-[11px] text-slate-600 whitespace-nowrap">{item.rawName1 || '-'}</td>
@@ -150,6 +152,8 @@ export default function TestingPending({ data, onOpenTestingForm }) {
       <div className="flex-1 min-h-0 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
         <DataTable
           headers={tableHeaders}
+          allHeaders={allHeaders}
+          visibleColumns={visibleColumns}
           data={paginatedPending}
           renderRow={renderRow}
           renderCard={renderCard}

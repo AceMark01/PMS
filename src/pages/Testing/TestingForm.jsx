@@ -2,6 +2,14 @@ import React, { useState, useEffect } from 'react';
 import ModalForm from '../../components/ModalForm';
 import { Calendar, ShieldCheck, Ban, FileText } from 'lucide-react';
 
+const formatDate = (date) => {
+  if (!date) return '';
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+};
+
 export default function TestingForm({ isOpen, onClose, onSubmitTesting, record }) {
   const [testingStatus, setTestingStatus] = useState('Approved');
   const [testingRemarks, setTestingRemarks] = useState('');
@@ -34,15 +42,7 @@ export default function TestingForm({ isOpen, onClose, onSubmitTesting, record }
 
     const testingRecord = {
       id: `tst-${Date.now()}`,
-      timestamp: new Date().toLocaleString('en-IN', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: true
-      }),
+      timestamp: formatDate(new Date()),
       // Reference to actual production ID
       productionRecordId: record.id,
       // Carry over all columns from actual production history

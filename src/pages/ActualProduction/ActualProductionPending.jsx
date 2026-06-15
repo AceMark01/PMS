@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import DataTable from '../../components/DataTable';
 import { Play } from 'lucide-react';
 
-export default function ActualProductionPending({ data, onOpenProductionForm }) {
+export default function ActualProductionPending({ data, onOpenProductionForm, visibleColumns = [] }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
 
@@ -12,7 +12,7 @@ export default function ActualProductionPending({ data, onOpenProductionForm }) 
     currentPage * itemsPerPage
   );
 
-  const tableHeaders = [
+  const allHeaders = [
     "Action",
     "JOB Card No.",
     "S NO",
@@ -34,6 +34,8 @@ export default function ActualProductionPending({ data, onOpenProductionForm }) 
     "Status",
     "Costing Image"
   ];
+
+  const tableHeaders = allHeaders.filter(h => h === 'Action' || visibleColumns.includes(h));
 
   const renderRow = (item, idx) => {
     const isProfit = item.profitLoss >= 0;
@@ -58,7 +60,7 @@ export default function ActualProductionPending({ data, onOpenProductionForm }) 
               {item.jobCardNo}
             </span>
           ) : (
-            <span className="text-gray-400 font-semibold">-</span>
+            '-'
           )}
         </td>
         {/* S NO */}
@@ -66,13 +68,13 @@ export default function ActualProductionPending({ data, onOpenProductionForm }) 
         {/* Timestamp */}
         <td className="px-4 py-3 text-center text-xs text-gray-500 whitespace-nowrap">{item.timestamp}</td>
         {/* Product code */}
-        <td className="px-4 py-3 text-center text-xs text-indigo-600 font-bold">{item.productCode}</td>
+        <td className="px-4 py-3 text-center text-xs text-indigo-600 font-bold whitespace-nowrap">{item.productCode}</td>
         {/* Product Name */}
         <td className="px-4 py-3 text-center text-xs font-semibold text-gray-900 uppercase min-w-[200px] break-words whitespace-normal">{item.productName}</td>
         {/* BAse Cat */}
         <td className="px-4 py-3 text-center text-[11px] text-gray-600">{item.baseCat}</td>
         {/* Order Quantity */}
-        <td className="px-4 py-3 text-center text-xs text-slate-800 font-medium">{item.qty}</td>
+        <td className="px-4 py-3 text-center text-xs text-slate-800 font-semibold">{item.qty} pcs</td>
         {/* Raw Names */}
         <td className="px-4 py-3 text-center text-[11px] text-slate-600 min-w-[220px] whitespace-normal break-words">{item.rawNames}</td>
         {/* Raw Quantities */}
@@ -104,7 +106,7 @@ export default function ActualProductionPending({ data, onOpenProductionForm }) 
               ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
               : 'bg-rose-100 text-rose-800 border border-rose-200'
           }`}>
-            {item.status}
+            {item.status || 'Pending'}
           </span>
         </td>
         {/* Costing Image */}
@@ -145,12 +147,12 @@ export default function ActualProductionPending({ data, onOpenProductionForm }) 
 
         <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 text-[11px] bg-slate-50 rounded-lg p-2.5 border border-slate-100/50">
           <div>
-            <span className="text-gray-400 block uppercase text-[8px] tracking-tight font-black">JOB Card No.</span>
-            <span className="text-slate-800 font-extrabold">{item.jobCardNo || '-'}</span>
+            <span className="text-gray-400 block uppercase text-[8px] tracking-tight">JC-Job Card</span>
+            <span className="text-slate-800 font-extrabold">{item.jobCardNo}</span>
           </div>
           <div>
-            <span className="text-gray-400 block uppercase text-[8px] tracking-tight">Total Cost</span>
-            <span className="text-slate-900 font-bold">₹{(item.totalProductionCost || 0).toLocaleString('en-IN')}</span>
+            <span className="text-gray-400 block uppercase text-[8px] tracking-tight">Order Quantity</span>
+            <span className="text-gray-900 font-semibold">{item.qty} pcs</span>
           </div>
         </div>
       </div>
@@ -162,10 +164,12 @@ export default function ActualProductionPending({ data, onOpenProductionForm }) 
       <div className="flex-1 min-h-0 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
         <DataTable
           headers={tableHeaders}
+          allHeaders={allHeaders}
+          visibleColumns={visibleColumns}
           data={paginatedPending}
           renderRow={renderRow}
           renderCard={renderCard}
-          minWidth="1750px"
+          minWidth="2000px"
           currentPage={currentPage}
           totalPages={totalPages}
           itemsPerPage={itemsPerPage}

@@ -4,6 +4,7 @@ import { Search, RotateCcw, Filter, Edit2, Package, Box, ShieldAlert } from 'luc
 import DataTable from '../../components/DataTable';
 import SearchableDropdown from '../../components/SearchableDropdown';
 import ModalForm from '../../components/ModalForm';
+import ColumnToggle from '../../components/ColumnToggle';
 
 import { SEEDED_ITEMS } from '../../utils/seeds';
 import { productionAPI } from '../../services/api';
@@ -22,12 +23,27 @@ export default function Inventory() {
     closingStock: ''
   });
 
+  const updateOrInsertInventory = async (inventoryData) => {
+    const result = await productionAPI.getSheetData('Live IMS');
+    if (result.success && result.records) {
+      const match = result.records.find(r => r.productCode === inventoryData.productCode);
+      if (match) {
+        return await productionAPI.updateRow('Live IMS', match.rowIndex, inventoryData);
+      }
+    }
+    return await productionAPI.insertRow('Live IMS', inventoryData);
+  };
+
   const fetchInventory = async () => {
     setLoading(true);
     try {
-      const result = await productionAPI.getInventory();
+      const result = await productionAPI.getSheetData('Live IMS');
       if (result.success) {
-        let fetchedData = result.records;
+        let fetchedData = result.records.map(r => ({
+          ...r,
+          maxLevel: Number(r.maxLevel) || 0,
+          closingStock: Number(r.closingStock) || 0
+        }));
 
         // Sync with master items
         const masterItems = SEEDED_ITEMS;
@@ -48,7 +64,7 @@ export default function Inventory() {
             updated.push(newItem);
             changed = true;
             // Auto sync to sheet
-            productionAPI.updateInventory(newItem).catch(err => console.error('Error auto-syncing item:', err));
+            updateOrInsertInventory(newItem).catch(err => console.error('Error auto-syncing item:', err));
           }
         });
 
@@ -77,6 +93,22 @@ export default function Inventory() {
 
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
+
+  const allHeaders = useMemo(() => [
+    "Product Code", "Product Name", "Max Level", "Prod Group", "Closing Stock"
+  ], []);
+
+  const [visibleColumns, setVisibleColumns] = useState([
+    "Product Code", "Product Name", "Max Level", "Prod Group", "Closing Stock"
+  ]);
+
+  const handleToggleColumn = (columnName) => {
+    setVisibleColumns(prev => 
+      prev.includes(columnName)
+        ? prev.filter(c => c !== columnName)
+        : [...prev, columnName]
+    );
+  };
 
   const handleClearFilters = () => {
     setFilters({
@@ -115,7 +147,7 @@ export default function Inventory() {
         closingStock: Number(editForm.closingStock)
       };
 
-      const result = await productionAPI.updateInventory(inventoryData);
+      const result = await updateOrInsertInventory(inventoryData);
       if (result.success) {
         toast.success('Inventory record updated successfully!', { id: loadToast });
         setShowEditModal(false);
@@ -161,23 +193,13 @@ export default function Inventory() {
     currentPage * itemsPerPage
   );
 
-  const tableHeaders = [
-    "Action", "Product Code", "Product Name", "Max Level", "Prod Group", "Closing Stock"
-  ];
+  const tableHeaders = allHeaders.filter(h => visibleColumns.includes(h));
 
   const renderRow = (item, idx) => {
     const isLowStock = item.closingStock < item.maxLevel * 0.2;
     return (
       <tr key={item.productCode} className="hover:bg-indigo-50/30 transition-colors border-b border-gray-100">
-        <td className="px-4 py-3 text-center whitespace-nowrap text-xs">
-          <button
-            onClick={() => handleEditClick(item)}
-            className="p-1 text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700 rounded transition-all active:scale-95 inline-flex items-center justify-center"
-            title="Edit Stock Details"
-          >
-            <Edit2 size={15} />
-          </button>
-        </td>
+
         <td className="px-4 py-3 text-center text-xs text-indigo-600 font-bold whitespace-nowrap">{item.productCode}</td>
         <td className="px-4 py-3 text-center text-xs font-semibold text-gray-900 whitespace-nowrap uppercase">{item.productName}</td>
         <td className="px-4 py-3 text-center text-xs text-slate-700 font-bold whitespace-nowrap">{item.maxLevel}</td>
@@ -320,6 +342,12 @@ export default function Inventory() {
               <RotateCcw size={16} />
             </button>
 
+            <ColumnToggle
+              headers={allHeaders}
+              visibleColumns={visibleColumns}
+              onToggleColumn={handleToggleColumn}
+            />
+
           </div>
         </div>
       </div>
@@ -328,6 +356,8 @@ export default function Inventory() {
       <div className="flex-1 min-h-0 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
         <DataTable
           headers={tableHeaders}
+          allHeaders={allHeaders}
+          visibleColumns={visibleColumns}
           data={paginatedInventory}
           renderRow={renderRow}
           renderCard={renderCard}

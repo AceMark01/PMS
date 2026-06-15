@@ -1,23 +1,128 @@
 // API service for Google Apps Script backend
-const API_URL = 'https://script.google.com/macros/s/AKfycbxwV8CRKru8ka6R-zR_-XWj1QwD4F7SaSBt1whTnwGQ2Zp-km0W4MKt-oAogHFeezs6/exec'; // Replace with your deployed web app URL
+// In dev, requests go to /api/gas/exec (proxied by Vite → GAS, no CORS).
+// In production builds, the real GAS URL is used directly.
+const API_URL = import.meta.env.DEV
+    ? '/api/gas/exec'
+    : import.meta.env.VITE_GOOGLE_SHEETS_API;
+
+function getHeaderKey(h) {
+    if (!h) return '';
+    const clean = h.toString().replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim();
+    const upper = clean.toUpperCase();
+    if (upper === 'S NO' || upper === 'S.NO.' || upper === 'S. NO') {
+        return 'sNo';
+    }
+    if (upper === 'QUANTITY (J/I)' || upper === 'QUANTITY(J/I)' || upper === 'QUANTITY (J I)') {
+        return 'qty';
+    }
+    if (upper === 'QTY(FROM RAW MATERIAL)' || upper === 'QTY(FROM RAW)') {
+        return 'qtyFromRaw';
+    }
+    if (upper === 'FG CODE' || upper === 'FGCODE') {
+        return 'fgCode';
+    }
+    if (upper === 'CHECK JC' || upper === 'CHECKJC') {
+        return 'checkJc';
+    }
+    if (upper === 'JOB CARD NO.' || upper === 'JOB CARD NO' || upper === 'JOB CARD' || upper === 'JOBCARDNO') {
+        return 'jobCardNo';
+    }
+    if (upper === 'BASE CAT' || upper === 'BASECAT' || upper === 'BASE CAT.') {
+        return 'baseCat';
+    }
+    if (upper === 'PROD GROUP' || upper === 'PRODGROUP') {
+        return 'prodGroup';
+    }
+    if (upper === 'PRODUCT CODE' || upper === 'PRODUCTCODE') {
+        return 'productCode';
+    }
+    if (upper === 'PRODUCT NAME' || upper === 'PRODUCTNAME') {
+        return 'productName';
+    }
+    if (upper === 'ORDER QUANTITY' || upper === 'ORDERQUANTITY') {
+        return 'qty';
+    }
+    if (upper.includes('ORDER CANCEL') || upper.includes('PRE-CLOSED')) {
+        return 'orderCancel';
+    }
+    if (upper.includes('ACTUAL PRODUCTION PLANNED')) {
+        return 'actualProductionPlanned';
+    }
+    if (upper.includes('ACTUAL PRODUCTION DONE')) {
+        return 'actualProductionDone';
+    }
+    if (upper.includes('PLANNING PENDING QTY') || upper.includes('PLANNING PENDING')) {
+        return 'planningPendingQty';
+    }
+    if (upper.includes('PRODUCTION PENDING QTY') || upper.includes('PRODUCTION PENDING')) {
+        return 'productionPendingQty';
+    }
+    if (upper.includes('DATE OF COMPLETE PLANNING') || upper.includes('COMPLETE PLANNING')) {
+        return 'dateOfCompletePlanning';
+    }
+    if (upper.includes('DATE OF COMPLETE PRODUCTION') || upper.includes('COMPLETE PRODUCTION')) {
+        return 'dateOfCompleteProduction';
+    }
+    return clean
+        .replace(/(?:^\w|[A-Z]|\b\w)/g, (word, index) => index === 0 ? word.toLowerCase() : word.toUpperCase())
+        .replace(/\s+/g, '');
+}
+
+function convert2DArrayToObjects(data, headerRow = 1) {
+    if (!data || data.length === 0) return [];
+    const headers = data[0];
+    const rows = data.slice(1);
+    
+    const headerKeys = headers.map(getHeaderKey);
+
+    return rows
+        .map((row, rowIndex) => {
+            const obj = { 
+                id: row[0],
+                rowIndex: rowIndex + headerRow + 1,
+                __rowValues: row
+            };
+            let hasData = false;
+            headerKeys.forEach((key, colIndex) => {
+                if (key) {
+                    const val = row[colIndex];
+                    obj[key] = val;
+                    if (val !== undefined && val !== null && val.toString().trim() !== '') {
+                        hasData = true;
+                    }
+                }
+            });
+            return hasData ? obj : null;
+        })
+        .filter(Boolean);
+}
+
+function mapObjectToRow(headers, obj) {
+    const headerKeys = headers.map(getHeaderKey);
+
+    const row = new Array(headers.length).fill('');
+    headerKeys.forEach((key, index) => {
+        if (key && obj[key] !== undefined) {
+            row[index] = obj[key];
+        }
+    });
+    return row;
+}
 
 export const productionAPI = {
-    // Fetch all production orders - Using POST method
-    async getProductionOrders() {
-        return this.getProductionOrdersPost();
-    },
-
-    // Use POST for all API calls to avoid CORS
-    async getProductionOrdersPost() {
+    // Get full sheet data parsed into camelCase objects
+    async getSheetData(sheetName, options = {}) {
         try {
             const response = await fetch(API_URL, {
                 method: 'POST',
                 mode: 'cors',
+                redirect: 'follow',
                 headers: {
                     'Content-Type': 'text/plain;charset=utf-8',
                 },
                 body: JSON.stringify({
-                    action: 'getProductionOrders'
+                    action: 'read',
+                    sheetName: sheetName
                 })
             });
 
@@ -26,25 +131,44 @@ export const productionAPI = {
             }
 
             const data = await response.json();
+            if (data.success && data.data) {
+                const headerRow = options.headerRow || 1;
+                const slicedData = data.data.slice(headerRow - 1);
+                const headers = slicedData.length > 0 ? slicedData[0] : [];
+                const records = convert2DArrayToObjects(slicedData, headerRow);
+                return { success: true, records, headers };
+            }
             return data;
         } catch (error) {
-            console.error('Error fetching production orders:', error);
+            console.error(`Error fetching sheet ${sheetName}:`, error);
             return { success: false, error: error.message };
         }
     },
 
-    // Add new production order
-    async addProductionOrder(orderData) {
+    // Insert a single row
+    async insertRow(sheetName, rowObjOrArray, options = {}) {
         try {
+            let rowData = rowObjOrArray;
+            if (!Array.isArray(rowData)) {
+                const headersResult = await this.getSheetHeaders(sheetName, options);
+                if (!headersResult.success) {
+                    throw new Error(`Failed to fetch headers for ${sheetName}`);
+                }
+                rowData = mapObjectToRow(headersResult.headers, rowObjOrArray);
+            }
+
             const response = await fetch(API_URL, {
                 method: 'POST',
                 mode: 'cors',
+                redirect: 'follow',
                 headers: {
                     'Content-Type': 'text/plain;charset=utf-8',
                 },
                 body: JSON.stringify({
-                    action: 'addProductionOrder',
-                    orderData: orderData
+                    action: 'insert',
+                    sheetName: sheetName,
+                    rowData: rowData,
+                    options: options
                 })
             });
 
@@ -52,26 +176,37 @@ export const productionAPI = {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
-            const data = await response.json();
-            return data;
+            return await response.json();
         } catch (error) {
-            console.error('Error adding production order:', error);
+            console.error(`Error inserting row into ${sheetName}:`, error);
             return { success: false, error: error.message };
         }
     },
 
-    // Delete production order
-    async deleteProductionOrder(sNo) {
+    // Batch insert multiple rows
+    async batchInsertRows(sheetName, rowsDataObjOrArray, options = {}) {
         try {
+            let rowsData = rowsDataObjOrArray;
+            if (rowsData.length > 0 && !Array.isArray(rowsData[0])) {
+                const headersResult = await this.getSheetHeaders(sheetName, options);
+                if (!headersResult.success) {
+                    throw new Error(`Failed to fetch headers for ${sheetName}`);
+                }
+                rowsData = rowsDataObjOrArray.map(obj => mapObjectToRow(headersResult.headers, obj));
+            }
+
             const response = await fetch(API_URL, {
                 method: 'POST',
                 mode: 'cors',
+                redirect: 'follow',
                 headers: {
                     'Content-Type': 'text/plain;charset=utf-8',
                 },
                 body: JSON.stringify({
-                    action: 'deleteProductionOrder',
-                    sNo: sNo
+                    action: 'batchInsert',
+                    sheetName: sheetName,
+                    rowsData: rowsData,
+                    options: options
                 })
             });
 
@@ -79,164 +214,37 @@ export const productionAPI = {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
-            const data = await response.json();
-            return data;
+            return await response.json();
         } catch (error) {
-            console.error('Error deleting production order:', error);
+            console.error(`Error batch inserting rows into ${sheetName}:`, error);
             return { success: false, error: error.message };
         }
     },
 
-    // Update kitting data for a list of S Nos
-    async updateKittingData(sNos, kittingData) {
+    // Update a single row by rowIndex
+    async updateRow(sheetName, rowIndex, rowObjOrArray) {
         try {
-            const response = await fetch(API_URL, {
-                method: 'POST',
-                mode: 'cors',
-                headers: {
-                    'Content-Type': 'text/plain;charset=utf-8',
-                },
-                body: JSON.stringify({
-                    action: 'updateKittingData',
-                    sNos: sNos,
-                    kittingData: kittingData
-                })
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+            let rowData = rowObjOrArray;
+            if (!Array.isArray(rowData)) {
+                const headersResult = await this.getSheetHeaders(sheetName);
+                if (!headersResult.success) {
+                    throw new Error(`Failed to fetch headers for ${sheetName}`);
+                }
+                rowData = mapObjectToRow(headersResult.headers, rowObjOrArray);
             }
 
-            const data = await response.json();
-            return data;
-        } catch (error) {
-            console.error('Error updating kitting data:', error);
-            return { success: false, error: error.message };
-        }
-    },
-
-    // Clear kitting data (revert to pending) for a list of S Nos
-    async clearKittingData(sNos) {
-        try {
             const response = await fetch(API_URL, {
                 method: 'POST',
                 mode: 'cors',
+                redirect: 'follow',
                 headers: {
                     'Content-Type': 'text/plain;charset=utf-8',
                 },
                 body: JSON.stringify({
-                    action: 'clearKittingData',
-                    sNos: sNos
-                })
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-            return data;
-        } catch (error) {
-            console.error('Error clearing kitting data:', error);
-            return { success: false, error: error.message };
-        }
-    },
-
-    // Approve kitting data for a list of S Nos
-    async approveKittingData(sNos, status, remarks) {
-        try {
-            const response = await fetch(API_URL, {
-                method: 'POST',
-                mode: 'cors',
-                headers: {
-                    'Content-Type': 'text/plain;charset=utf-8',
-                },
-                body: JSON.stringify({
-                    action: 'approveKittingData',
-                    sNos: sNos,
-                    status: status,
-                    remarks: remarks
-                })
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-            return data;
-        } catch (error) {
-            console.error('Error approving kitting data:', error);
-            return { success: false, error: error.message };
-        }
-    },
-
-    // Fetch all BOM records
-    async getBOM() {
-        try {
-            const response = await fetch(API_URL, {
-                method: 'POST',
-                mode: 'cors',
-                headers: {
-                    'Content-Type': 'text/plain;charset=utf-8',
-                },
-                body: JSON.stringify({
-                    action: 'getBOM'
-                })
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-            return data;
-        } catch (error) {
-            console.error('Error fetching BOM:', error);
-            return { success: false, error: error.message };
-        }
-    },
-
-    // Add new BOM record
-    async addBOM(bomData) {
-        try {
-            const response = await fetch(API_URL, {
-                method: 'POST',
-                mode: 'cors',
-                headers: {
-                    'Content-Type': 'text/plain;charset=utf-8',
-                },
-                body: JSON.stringify({
-                    action: 'addBOM',
-                    bomData: bomData
-                })
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-            return data;
-        } catch (error) {
-            console.error('Error adding BOM:', error);
-            return { success: false, error: error.message };
-        }
-    },
-
-    // Update BOM record by rowIndex
-    async updateBOM(rowIndex, bomData) {
-        try {
-            const response = await fetch(API_URL, {
-                method: 'POST',
-                mode: 'cors',
-                headers: {
-                    'Content-Type': 'text/plain;charset=utf-8',
-                },
-                body: JSON.stringify({
-                    action: 'updateBOM',
+                    action: 'update',
+                    sheetName: sheetName,
                     rowIndex: rowIndex,
-                    bomData: bomData
+                    rowData: rowData
                 })
             });
 
@@ -244,25 +252,56 @@ export const productionAPI = {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
-            const data = await response.json();
-            return data;
+            return await response.json();
         } catch (error) {
-            console.error('Error updating BOM:', error);
+            console.error(`Error updating row in ${sheetName}:`, error);
             return { success: false, error: error.message };
         }
     },
 
-    // Delete BOM record by rowIndex
-    async deleteBOM(rowIndex) {
+    // Update a single cell
+    async updateCell(sheetName, rowIndex, columnIndex, value) {
         try {
             const response = await fetch(API_URL, {
                 method: 'POST',
                 mode: 'cors',
+                redirect: 'follow',
                 headers: {
                     'Content-Type': 'text/plain;charset=utf-8',
                 },
                 body: JSON.stringify({
-                    action: 'deleteBOM',
+                    action: 'updateCell',
+                    sheetName: sheetName,
+                    rowIndex: rowIndex,
+                    columnIndex: columnIndex,
+                    value: value
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            return await response.json();
+        } catch (error) {
+            console.error(`Error updating cell in ${sheetName}:`, error);
+            return { success: false, error: error.message };
+        }
+    },
+
+    // Delete a single row by rowIndex
+    async deleteRow(sheetName, rowIndex) {
+        try {
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                mode: 'cors',
+                redirect: 'follow',
+                headers: {
+                    'Content-Type': 'text/plain;charset=utf-8',
+                },
+                body: JSON.stringify({
+                    action: 'delete',
+                    sheetName: sheetName,
                     rowIndex: rowIndex
                 })
             });
@@ -271,249 +310,82 @@ export const productionAPI = {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
-            const data = await response.json();
-            return data;
+            return await response.json();
         } catch (error) {
-            console.error('Error deleting BOM:', error);
+            console.error(`Error deleting row in ${sheetName}:`, error);
             return { success: false, error: error.message };
         }
     },
 
-    // Fetch all inventory records
-    async getInventory() {
+    // Helper to get only headers
+    async getSheetHeaders(sheetName, options = {}) {
         try {
             const response = await fetch(API_URL, {
                 method: 'POST',
                 mode: 'cors',
+                redirect: 'follow',
                 headers: {
                     'Content-Type': 'text/plain;charset=utf-8',
                 },
                 body: JSON.stringify({
-                    action: 'getInventory'
+                    action: 'read',
+                    sheetName: sheetName
                 })
             });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             const data = await response.json();
-            return data;
+            if (data.success && data.data && data.data.length > 0) {
+                const headerRow = options.headerRow || 1;
+                const headers = data.data.length >= headerRow ? data.data[headerRow - 1] : data.data[0];
+                return { success: true, headers: headers };
+            }
+            return { success: false, error: "No data found" };
         } catch (error) {
-            console.error('Error fetching inventory:', error);
             return { success: false, error: error.message };
         }
     },
 
-    // Update or Add Inventory record
-    async updateInventory(inventoryData) {
+    // Upload a file to Google Drive folder
+    async uploadFile(base64Data, fileName, mimeType, folderId) {
         try {
+            console.log("api.js: uploadFile parameters:", {
+                fileName,
+                mimeType,
+                folderId,
+                base64DataLength: base64Data ? base64Data.length : 0
+            });
             const response = await fetch(API_URL, {
                 method: 'POST',
                 mode: 'cors',
+                redirect: 'follow',
                 headers: {
                     'Content-Type': 'text/plain;charset=utf-8',
                 },
                 body: JSON.stringify({
-                    action: 'updateInventory',
-                    inventoryData: inventoryData
+                    action: 'uploadFile',
+                    base64Data: base64Data,
+                    fileName: fileName,
+                    mimeType: mimeType,
+                    folderId: folderId
                 })
             });
 
+            console.log("api.js: uploadFile HTTP response status:", response.status, response.statusText);
+
             if (!response.ok) {
+                const errText = await response.text();
+                console.error("api.js: uploadFile HTTP error text:", errText);
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
-            const data = await response.json();
-            return data;
-        } catch (error) {
-            console.error('Error updating inventory:', error);
-            return { success: false, error: error.message };
-        }
-    },
-
-    // Fetch all Kitting Approval History records
-    async getKittingApprovalHistory() {
-        try {
-            const response = await fetch(API_URL, {
-                method: 'POST',
-                mode: 'cors',
-                headers: {
-                    'Content-Type': 'text/plain;charset=utf-8',
-                },
-                body: JSON.stringify({
-                    action: 'getKittingApprovalHistory'
-                })
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
+            const rawText = await response.clone().text();
+            console.log("api.js: uploadFile raw response body:", rawText);
 
             const data = await response.json();
+            console.log("api.js: uploadFile parsed JSON data:", data);
             return data;
         } catch (error) {
-            console.error('Error fetching approval history:', error);
-            return { success: false, error: error.message };
-        }
-    },
-
-    // Fetch all Actual Production records
-    async getActualProduction() {
-        try {
-            const response = await fetch(API_URL, {
-                method: 'POST',
-                mode: 'cors',
-                headers: {
-                    'Content-Type': 'text/plain;charset=utf-8',
-                },
-                body: JSON.stringify({
-                    action: 'getActualProduction'
-                })
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-            return data;
-        } catch (error) {
-            console.error('Error fetching actual production:', error);
-            return { success: false, error: error.message };
-        }
-    },
-
-    // Add new Actual Production record
-    async addActualProduction(productionData) {
-        try {
-            const response = await fetch(API_URL, {
-                method: 'POST',
-                mode: 'cors',
-                headers: {
-                    'Content-Type': 'text/plain;charset=utf-8',
-                },
-                body: JSON.stringify({
-                    action: 'addActualProduction',
-                    productionData: productionData
-                })
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-            return data;
-        } catch (error) {
-            console.error('Error adding actual production:', error);
-            return { success: false, error: error.message };
-        }
-    },
-
-    // Delete Actual Production record
-    async deleteActualProduction(sNo) {
-        try {
-            const response = await fetch(API_URL, {
-                method: 'POST',
-                mode: 'cors',
-                headers: {
-                    'Content-Type': 'text/plain;charset=utf-8',
-                },
-                body: JSON.stringify({
-                    action: 'deleteActualProduction',
-                    sNo: sNo
-                })
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-            return data;
-        } catch (error) {
-            console.error('Error deleting actual production:', error);
-            return { success: false, error: error.message };
-        }
-    },
-
-    // Fetch all Quality Testing records from Costing history
-    async getTestingHistory() {
-        try {
-            const response = await fetch(API_URL, {
-                method: 'POST',
-                mode: 'cors',
-                headers: {
-                    'Content-Type': 'text/plain;charset=utf-8',
-                },
-                body: JSON.stringify({
-                    action: 'getTestingHistory'
-                })
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-            return data;
-        } catch (error) {
-            console.error('Error fetching testing history:', error);
-            return { success: false, error: error.message };
-        }
-    },
-
-    // Add new Quality Testing record to Costing history
-    async addTestingHistory(testingData) {
-        try {
-            const response = await fetch(API_URL, {
-                method: 'POST',
-                mode: 'cors',
-                headers: {
-                    'Content-Type': 'text/plain;charset=utf-8',
-                },
-                body: JSON.stringify({
-                    action: 'addTestingHistory',
-                    testingData: testingData
-                })
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-            return data;
-        } catch (error) {
-            console.error('Error adding testing history:', error);
-            return { success: false, error: error.message };
-        }
-    },
-
-    // Delete Quality Testing record from Costing history
-    async deleteTestingHistory(sNo) {
-        try {
-            const response = await fetch(API_URL, {
-                method: 'POST',
-                mode: 'cors',
-                headers: {
-                    'Content-Type': 'text/plain;charset=utf-8',
-                },
-                body: JSON.stringify({
-                    action: 'deleteTestingHistory',
-                    sNo: sNo
-                })
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-            return data;
-        } catch (error) {
-            console.error('Error deleting testing history:', error);
+            console.error('api.js: Error uploading file:', error);
             return { success: false, error: error.message };
         }
     }

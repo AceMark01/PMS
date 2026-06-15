@@ -2,17 +2,19 @@ import React, { useState } from 'react';
 import DataTable from '../../components/DataTable';
 import { Trash2 } from 'lucide-react';
 
-export default function ApprovalHistory({ data, onDeleteHistory }) {
+export default function ApprovalHistory({ data, onDeleteHistory, visibleColumns = [] }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
 
-  const totalPages = Math.ceil(data.length / itemsPerPage);
-  const paginatedHistory = data.slice(
+  const nonHeaders = data.filter(item => item && item.sNo && item.sNo.toString().trim() !== '');
+
+  const totalPages = Math.ceil(nonHeaders.length / itemsPerPage);
+  const paginatedHistory = nonHeaders.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
 
-  const tableHeaders = [
+  const allHeaders = [
     "Action",
     "JOB Card No.",
     "S NO",
@@ -34,6 +36,8 @@ export default function ApprovalHistory({ data, onDeleteHistory }) {
     "Status",
     "Costing Image"
   ];
+
+  const tableHeaders = allHeaders.filter(h => h === 'Action' || visibleColumns.includes(h));
 
   const renderRow = (item, idx) => {
     const isProfit = item.profitLoss >= 0;
@@ -63,7 +67,7 @@ export default function ApprovalHistory({ data, onDeleteHistory }) {
         {/* S NO */}
         <td className="px-4 py-3 text-center text-xs text-gray-600 font-semibold">{item.sNo}</td>
         {/* Timestamp */}
-        <td className="px-4 py-3 text-center text-xs text-gray-500 whitespace-nowrap">{item.timestamp}</td>
+        <td className="px-4 py-3 text-center text-xs text-gray-505 text-gray-500 whitespace-nowrap">{item.timestamp}</td>
         {/* Product code */}
         <td className="px-4 py-3 text-center text-xs text-indigo-600 font-bold">{item.productCode}</td>
         {/* Product Name */}
@@ -168,6 +172,8 @@ export default function ApprovalHistory({ data, onDeleteHistory }) {
       <div className="flex-1 min-h-0 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
         <DataTable
           headers={tableHeaders}
+          allHeaders={allHeaders}
+          visibleColumns={visibleColumns}
           data={paginatedHistory}
           renderRow={renderRow}
           renderCard={renderCard}
@@ -177,7 +183,7 @@ export default function ApprovalHistory({ data, onDeleteHistory }) {
           itemsPerPage={itemsPerPage}
           onPageChange={setCurrentPage}
           onItemsPerPageChange={(val) => { setItemsPerPage(val); setCurrentPage(1); }}
-          totalResults={data.length}
+          totalResults={nonHeaders.length}
           itemsPerPageOptions={[50, 100, 200, 500]}
         />
       </div>

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import DataTable from '../../components/DataTable';
 import { Eye, ShieldAlert } from 'lucide-react';
 
-export default function ApprovalPending({ data, onOpenApprovalForm }) {
+export default function ApprovalPending({ data, onOpenApprovalForm, visibleColumns = [] }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
 
@@ -12,7 +12,7 @@ export default function ApprovalPending({ data, onOpenApprovalForm }) {
     currentPage * itemsPerPage
   );
 
-  const tableHeaders = [
+  const allHeaders = [
     "Action",
     "S NO",
     "Timestamp",
@@ -32,6 +32,8 @@ export default function ApprovalPending({ data, onOpenApprovalForm }) {
     "Profit / Loss %",
     "Costing Image"
   ];
+
+  const tableHeaders = allHeaders.filter(h => h === 'Action' || visibleColumns.includes(h));
 
   const renderRow = (item, idx) => {
     const isProfit = item.profitLoss >= 0;
@@ -156,6 +158,8 @@ export default function ApprovalPending({ data, onOpenApprovalForm }) {
       <div className="flex-1 min-h-0 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
         <DataTable
           headers={tableHeaders}
+          allHeaders={allHeaders}
+          visibleColumns={visibleColumns}
           data={paginatedPending}
           renderRow={renderRow}
           renderCard={renderCard}
