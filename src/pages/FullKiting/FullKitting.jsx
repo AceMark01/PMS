@@ -209,41 +209,64 @@ export default function FullKitting() {
 
       const timestamp = formatDate(new Date());
 
+      const sNosToDelete = records.map(r => r.sNo?.toString().trim()).filter(Boolean);
+
+      // 1. Delete existing rows for these S Nos to avoid duplicates and ensure clean replacement
+      if (historyRecords.length > 0 && sNosToDelete.length > 0) {
+        const matches = historyRecords
+          .filter(r => sNosToDelete.includes(r.sNo?.toString().trim()))
+          .map(r => r.rowIndex);
+
+        matches.sort((a, b) => b - a);
+        for (const rowIndex of matches) {
+          await productionAPI.deleteRow('Costing-History', rowIndex);
+        }
+      }
+
+      // 2. Prepare the expanded rows for batch insert
+      const rowsToInsert = [];
       for (const record of records) {
         const sNo = record.sNo?.toString().trim();
-        const matched = historyRecords.find(r => r.sNo?.toString().trim() === sNo);
 
-        const rowData = [
-          timestamp,
-          record.costingData.kittingTicket || '',
-          sNo,
-          record.costingData.fgName || '',
-          record.costingData.planQty || '0',
-          record.costingData.requiredRawMaterialName || '',
-          record.costingData.rawQty || '',
-          record.costingData.rawCost || '',
-          record.costingData.availableRawQty || '',
-          record.costingData.indentQty || '',
-          record.costingData.fgAvailableQty || '0',
-          record.costingData.totalRawRequiredQty || '0',
-          record.costingData.totalRawCost || '0',
-          record.costingData.extraAmount || '0',
-          record.costingData.totalProductionCost || '0',
-          record.costingData.sellingPrice || '0',
-          record.costingData.profitLoss || '0',
-          record.costingData.profitLossPercent || '0',
-          record.costingData.pdfLink || ''
-        ];
+        const rawNames = record.costingData.requiredRawMaterialName ? record.costingData.requiredRawMaterialName.split(',').map(s => s.trim()) : [];
+        const rawQties = record.costingData.rawQty ? record.costingData.rawQty.split(',').map(s => s.trim()) : [];
+        const rawCosts = record.costingData.rawCost ? record.costingData.rawCost.split(',').map(s => s.trim()) : [];
+        const availableRawQties = record.costingData.availableRawQty ? record.costingData.availableRawQty.split(',').map(s => s.trim()) : [];
+        const indentQties = record.costingData.indentQty ? record.costingData.indentQty.split(',').map(s => s.trim()) : [];
 
-        let result;
-        if (matched) {
-          result = await productionAPI.updateRow('Costing-History', matched.rowIndex, rowData);
-        } else {
-          result = await productionAPI.insertRow('Costing-History', rowData);
+        const numMaterials = Math.max(1, rawNames.length);
+
+        for (let i = 0; i < numMaterials; i++) {
+          const rowData = [
+            timestamp,
+            record.costingData.kittingTicket || '',
+            sNo,
+            record.costingData.fgName || '',
+            record.costingData.planQty || '0',
+            rawNames[i] || '',
+            rawQties[i] || '0',
+            rawCosts[i] || '0',
+            availableRawQties[i] || '0',
+            indentQties[i] || '0',
+            record.costingData.fgAvailableQty || '0',
+            record.costingData.totalRawRequiredQty || '0',
+            record.costingData.totalRawCost || '0',
+            record.costingData.extraAmount || '0',
+            record.costingData.totalProductionCost || '0',
+            record.costingData.sellingPrice || '0',
+            record.costingData.profitLoss || '0',
+            record.costingData.profitLossPercent || '0',
+            record.costingData.pdfLink || ''
+          ];
+          rowsToInsert.push(rowData);
         }
+      }
 
+      // 3. Batch insert all the newly expanded rows
+      if (rowsToInsert.length > 0) {
+        const result = await productionAPI.batchInsertRows('Costing-History', rowsToInsert);
         if (!result.success) {
-          throw new Error(result.error || `Failed to save S NO ${sNo}`);
+          throw new Error(result.error || 'Failed to insert costing rows');
         }
       }
 

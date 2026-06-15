@@ -158,6 +158,8 @@ export default function Testing() {
       if (matchedProd) {
         return {
           ...matchedProd,
+          id: jc.id,
+          rowIndex: jc.rowIndex
         };
       }
 
@@ -286,7 +288,10 @@ export default function Testing() {
   };
 
   const handleOpenTestingForm = (recordId) => {
-    const record = pendingTesting.find(p => p.id === recordId);
+    const record = pendingTesting.find(p => 
+      String(p.id) === String(recordId) || 
+      String(p.rowIndex) === String(recordId)
+    );
     if (record) {
       setSelectedRecord(record);
       setIsFormOpen(true);
@@ -296,43 +301,32 @@ export default function Testing() {
   const handleSubmitTesting = async (recordId, testingRecord) => {
     setLoading(true);
     try {
-      const jcRecord = jobCardHistory.find(jc => jc.id === recordId);
+      const jcRecord = jobCardHistory.find(jc => 
+        String(jc.id) === String(recordId) || 
+        String(jc.rowIndex) === String(recordId)
+      );
       if (!jcRecord) {
         toast.error('Job Card record not found');
         return;
       }
 
-      const newRowData = [...(jcRecord.__rowValues || [])];
-      while (newRowData.length < 40) {
-        newRowData.push('');
-      }
-
       const actual2 = formatDate(new Date());
-      const planned2 = newRowData[35] || '';
-      
-      let delay = '';
-      if (planned2) {
-        const pDate = new Date(planned2);
-        const aDate = new Date(actual2);
-        if (!isNaN(pDate.getTime()) && !isNaN(aDate.getTime())) {
-          const diffMs = aDate - pDate;
-          const diffHrs = (diffMs / (1000 * 60 * 60)).toFixed(2);
-          delay = `${diffHrs} Hrs`;
-        }
-      }
 
-      newRowData[36] = actual2;
-      newRowData[37] = delay;
-      newRowData[38] = testingRecord.testingStatus;
-      newRowData[39] = testingRecord.testingRemarks || '';
+      // Update only columns AK (37), AM (39), and AN (40) to preserve other columns and formulas
+      const result = await Promise.all([
+        productionAPI.updateCell('JOB CARD', jcRecord.rowIndex, 37, actual2),
+        productionAPI.updateCell('JOB CARD', jcRecord.rowIndex, 39, testingRecord.testingStatus),
+        productionAPI.updateCell('JOB CARD', jcRecord.rowIndex, 40, testingRecord.testingRemarks || '')
+      ]);
 
-      const result = await productionAPI.updateRow('JOB CARD', jcRecord.rowIndex, newRowData);
-      if (result.success) {
+      const allSuccess = result.every(res => res.success);
+      if (allSuccess) {
         toast.success(`Quality testing successfully submitted: ${testingRecord.testingStatus}!`);
         setIsFormOpen(false);
         await fetchData();
       } else {
-        toast.error(`Failed to submit testing: ${result.error}`);
+        const errors = result.map(res => res.error).filter(Boolean).join(', ');
+        toast.error(`Failed to submit testing: ${errors}`);
       }
     } catch (err) {
       console.error(err);
@@ -343,7 +337,10 @@ export default function Testing() {
   };
 
   const handleDeleteHistory = async (historyId) => {
-    const jcRecord = jobCardHistory.find(jc => jc.id === historyId);
+    const jcRecord = jobCardHistory.find(jc => 
+      String(jc.id) === String(historyId) || 
+      String(jc.rowIndex) === String(historyId)
+    );
     if (!jcRecord) {
       toast.error('Job Card record not found');
       return;
@@ -351,23 +348,20 @@ export default function Testing() {
     if (window.confirm('Are you sure you want to delete this testing record? This will revert the record back to Pending Testing.')) {
       setLoading(true);
       try {
-        const newRowData = [...(jcRecord.__rowValues || [])];
-        while (newRowData.length < 40) {
-          newRowData.push('');
-        }
+        // Clear only columns AK (37), AM (39), and AN (40) to revert, keeping all other formulas intact
+        const result = await Promise.all([
+          productionAPI.updateCell('JOB CARD', jcRecord.rowIndex, 37, ''),
+          productionAPI.updateCell('JOB CARD', jcRecord.rowIndex, 39, ''),
+          productionAPI.updateCell('JOB CARD', jcRecord.rowIndex, 40, '')
+        ]);
 
-        // Clear AK, AL, AM, AN (indices 36, 37, 38, 39)
-        newRowData[36] = '';
-        newRowData[37] = '';
-        newRowData[38] = '';
-        newRowData[39] = '';
-
-        const result = await productionAPI.updateRow('JOB CARD', jcRecord.rowIndex, newRowData);
-        if (result.success) {
+        const allSuccess = result.every(res => res.success);
+        if (allSuccess) {
           toast.success('Testing log cleared and job reverted back to pending testing.');
           await fetchData();
         } else {
-          toast.error(`Failed to delete testing record: ${result.error}`);
+          const errors = result.map(res => res.error).filter(Boolean).join(', ');
+          toast.error(`Failed to delete testing record: ${errors}`);
         }
       } catch (err) {
         console.error(err);
