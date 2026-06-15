@@ -75,6 +75,7 @@ const SearchableDropdown = ({
       <button
         type="button"
         onClick={handleToggle}
+        title={selectedOption ? selectedOption.label : ''}
         className={`w-full bg-white border border-gray-300 ${rounded} px-2 py-1 flex justify-between items-center cursor-pointer hover:border-indigo-500 transition-all ${height} shadow-sm group outline-none focus:ring-1 focus:ring-indigo-500/30 active:scale-[0.98]`}
       >
         <span className={`text-[11px] md:text-[13px] truncate ${selectedOption ? 'text-gray-900' : 'text-gray-400'}`}>
@@ -88,7 +89,7 @@ const SearchableDropdown = ({
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className={`absolute left-0 right-0 ${openUp ? 'bottom-full mb-1' : 'top-full mt-1'} bg-white border border-gray-200 rounded shadow-2xl z-[150] overflow-hidden animate-in fade-in zoom-in-95 duration-100 min-w-[180px]`}>
+        <div className={`absolute left-0 right-0 md:right-auto md:min-w-[380px] md:w-max ${openUp ? 'bottom-full mb-1' : 'top-full mt-1'} bg-white border border-gray-200 rounded shadow-2xl z-[150] overflow-hidden animate-in fade-in zoom-in-95 duration-100 min-w-[180px] max-w-[90vw]`}>
           {/* Search Box */}
           <div className="p-1.5 border-b border-gray-100 bg-gray-50 flex gap-1.5 items-center">
             <div className="relative flex-1">
@@ -122,7 +123,7 @@ const SearchableDropdown = ({
                       : 'text-gray-700'
                     }`}
                 >
-                  <span className="truncate">{opt.label}</span>
+                  <span className="whitespace-normal break-words pr-2">{opt.label}</span>
                   {value === opt.value && (
                     <Check size={12} className="text-indigo-600 flex-shrink-0" />
                   )}

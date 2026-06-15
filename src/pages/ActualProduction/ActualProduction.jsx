@@ -82,6 +82,28 @@ export default function ActualProduction() {
             status: record.approvalStatus || 'Approved',
             remarks: record.approvalRemarks || '',
             
+            // Raw materials from JOB CARD row
+            rawName1: record.rawName1 || record.__rowValues?.[9] || '',
+            rawName2: record.rawName2 || record.__rowValues?.[10] || '',
+            rawName3: record.rawName3 || record.__rowValues?.[11] || '',
+            rawName4: record.rawName4 || record.__rowValues?.[12] || '',
+            rawName5: record.rawName5 || record.__rowValues?.[13] || '',
+            rawName6: record.rawName6 || record.__rowValues?.[14] || '',
+            rawName7: record.rawName7 || record.__rowValues?.[15] || '',
+            rawName8: record.rawName8 || record.__rowValues?.[16] || '',
+            rawName9: record.rawName9 || record.__rowValues?.[17] || '',
+            rawName10: record.rawName10 || record.__rowValues?.[18] || '',
+            rawQty1: record.rawQty1 || record.__rowValues?.[19] || '',
+            rawQty2: record.rawQty2 || record.__rowValues?.[20] || '',
+            rawQty3: record.rawQty3 || record.__rowValues?.[21] || '',
+            rawQty4: record.rawQty4 || record.__rowValues?.[22] || '',
+            rawQty5: record.rawQty5 || record.__rowValues?.[23] || '',
+            rawQty6: record.rawQty6 || record.__rowValues?.[24] || '',
+            rawQty7: record.rawQty7 || record.__rowValues?.[25] || '',
+            rawQty8: record.rawQty8 || record.__rowValues?.[26] || '',
+            rawQty9: record.rawQty9 || record.__rowValues?.[27] || '',
+            rawQty10: record.rawQty10 || record.__rowValues?.[28] || '',
+
             // Costing fields from matching costing history record
             rawNames: matchedCosting ? (matchedCosting.requiredRawMaterialName || matchedCosting.rawNames || '') : '',
             rawQuantities: matchedCosting ? (matchedCosting.rawQty || matchedCosting.rawQuantities || '') : '',

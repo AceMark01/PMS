@@ -47,25 +47,49 @@ export default function ActualProductionForm({ isOpen, onClose, onSubmitProducti
     }
   }, [isOpen]);
 
-  // Load and parse initial raw materials from kitting record
+  // Load and parse initial raw materials from kitting record (JOB CARD columns J-AC)
   useEffect(() => {
     if (isOpen && record) {
-      const rawNamesArr = record.rawNames ? record.rawNames.split(',').map(n => n.trim()) : [];
-      const rawQtysArr = record.rawQuantities ? record.rawQuantities.split(',').map(q => q.trim()) : [];
+      console.log("ActualProductionForm: record loaded:", record);
+      console.log("ActualProductionForm: uniqueRawMaterials in dropdown:", uniqueRawMaterials);
       
       const initial = [];
-      const maxLength = Math.max(rawNamesArr.length, rawQtysArr.length);
-      for (let i = 0; i < maxLength; i++) {
-        if (rawNamesArr[i] || rawQtysArr[i]) {
+      for (let i = 1; i <= 10; i++) {
+        const nameVal = record[`rawName${i}`] || (record.__rowValues && record.__rowValues[8 + i]) || '';
+        const qtyVal = record[`rawQty${i}`] || (record.__rowValues && record.__rowValues[18 + i]) || '';
+        
+        console.log(`Index ${i}: nameVal = "${nameVal}", qtyVal = "${qtyVal}"`);
+        
+        if (nameVal || qtyVal) {
           initial.push({
-            name: rawNamesArr[i] || '',
-            qty: rawQtysArr[i] || ''
+            name: nameVal.toString().trim(),
+            qty: qtyVal.toString().trim()
           });
         }
       }
+
+      console.log("ActualProductionForm: initial parsed from columns:", initial);
+
+      // Fallback to costing history raw names/quantities if JOB CARD has no raw materials
+      if (initial.length === 0) {
+        console.log("ActualProductionForm: JOB CARD raw columns empty, falling back to costing history fields");
+        const rawNamesArr = record.rawNames ? record.rawNames.split(',').map(n => n.trim()) : [];
+        const rawQtysArr = record.rawQuantities ? record.rawQuantities.split(',').map(q => q.trim()) : [];
+        const maxLength = Math.max(rawNamesArr.length, rawQtysArr.length);
+        for (let i = 0; i < maxLength; i++) {
+          if (rawNamesArr[i] || rawQtysArr[i]) {
+            initial.push({
+              name: rawNamesArr[i] || '',
+              qty: rawQtysArr[i] || ''
+            });
+          }
+        }
+        console.log("ActualProductionForm: initial parsed from fallback:", initial);
+      }
+
       setEditedRaws(initial);
     }
-  }, [isOpen, record]);
+  }, [isOpen, record, uniqueRawMaterials]);
 
   if (!record) return null;
 
@@ -247,6 +271,9 @@ export default function ActualProductionForm({ isOpen, onClose, onSubmitProducti
                             required
                           >
                             <option value="">-- Select Material --</option>
+                            {item.name && !uniqueRawMaterials.includes(item.name) && (
+                              <option value={item.name}>{item.name}</option>
+                            )}
                             {uniqueRawMaterials.map((mName, mIdx) => (
                               <option key={mIdx} value={mName}>{mName}</option>
                             ))}
