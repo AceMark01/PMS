@@ -4,7 +4,7 @@ import { Toaster } from 'react-hot-toast';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Settings from './pages/Settings';
-import BOM from './pages/Master/BOM';
+import BOM from './pages/BOM/BOM';
 import Inventory from './pages/Inventory/Inventory';
 import Dasboard from './pages/Dashboard/Dasboard';
 import OrderDetails from './pages/OrderOfProduction/OrderDetails';

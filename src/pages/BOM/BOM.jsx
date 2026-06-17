@@ -25,7 +25,8 @@ export default function BOM() {
     try {
       const result = await productionAPI.getSheetData('BOM');
       if (result.success) {
-        setMaterials(result.records.map(r => ({
+        const validRecords = result.records.filter(r => r.rawItemName && r.rawItemName.trim() !== '');
+        setMaterials(validRecords.map(r => ({
           ...r,
           qty: Number(r.qty) || 0,
           costPerUnit: Number(r.costPerUnit) || 0,
@@ -64,6 +65,10 @@ export default function BOM() {
 
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters]);
 
   const allHeaders = useMemo(() => [
     "Product Name", "FG Code", "Raw Item Name", "Item Code", "Unit", "Quantity (J/I)", "Cost Per Unit", "Total Cost", "Batch Qty", "Qty(From Raw Material)"
@@ -258,22 +263,31 @@ export default function BOM() {
   }, [materials]);
 
   const unitsList = useMemo(() => {
-    return Array.from(new Set(materials.map(m => m.unit))).filter(Boolean).sort();
+    const rawUnits = materials.map(m => m.unit).filter(Boolean);
+    const uniqueMap = new Map();
+    rawUnits.forEach(u => {
+      const trimmed = u.trim();
+      const lower = trimmed.toLowerCase();
+      if (!uniqueMap.has(lower)) {
+        uniqueMap.set(lower, trimmed);
+      }
+    });
+    return Array.from(uniqueMap.values()).sort();
   }, [materials]);
 
   // Apply filters
   const filteredMaterials = useMemo(() => {
     return materials.filter(m => {
       if (filters.productName && m.productName !== filters.productName) return false;
-      if (filters.unit && m.unit !== filters.unit) return false;
+      if (filters.unit && String(m.unit).trim().toLowerCase() !== String(filters.unit).trim().toLowerCase()) return false;
 
       if (filters.searchQuery) {
         const q = filters.searchQuery.toLowerCase();
         return (
-          m.productName.toLowerCase().includes(q) ||
-          m.fgCode.toLowerCase().includes(q) ||
-          m.rawItemName.toLowerCase().includes(q) ||
-          m.itemCode.toLowerCase().includes(q)
+          (m.productName ? String(m.productName).toLowerCase() : '').includes(q) ||
+          (m.fgCode ? String(m.fgCode).toLowerCase() : '').includes(q) ||
+          (m.rawItemName ? String(m.rawItemName).toLowerCase() : '').includes(q) ||
+          (m.itemCode ? String(m.itemCode).toLowerCase() : '').includes(q)
         );
       }
       return true;

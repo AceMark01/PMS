@@ -21,6 +21,9 @@ function getHeaderKey(h) {
     if (upper === 'FG CODE' || upper === 'FGCODE') {
         return 'fgCode';
     }
+    if (upper === 'UNIT') {
+        return 'unit';
+    }
     if (upper === 'CHECK JC' || upper === 'CHECKJC') {
         return 'checkJc';
     }

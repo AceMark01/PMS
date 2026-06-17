@@ -30,13 +30,13 @@ export default function OrderDetails() {
     "BaseCat", 
     "Order Quantity", 
     "Godown",
-    "Order Cancel (Pre-Closed)",
+    // "Order Cancel (Pre-Closed)",
     "Actual Production Planned",
     "Actual Production Done",
     "Planning Pending Qty",
     "Production Pending Qty",
-    "Date Of Complete Planning",
-    "Date Of Complete Production"
+    // "Date Of Complete Planning",
+    // "Date Of Complete Production"
   ], []);
 
   const [visibleColumns, setVisibleColumns] = useState([
@@ -47,13 +47,10 @@ export default function OrderDetails() {
     "BaseCat", 
     "Order Quantity", 
     "Godown",
-    "Order Cancel (Pre-Closed)",
     "Actual Production Planned",
     "Actual Production Done",
     "Planning Pending Qty",
     "Production Pending Qty",
-    "Date Of Complete Planning",
-    "Date Of Complete Production"
   ]);
 
   const handleToggleColumn = (columnName) => {
@@ -89,13 +86,11 @@ export default function OrderDetails() {
             baseCat: order.baseCat || '',
             qty: order.qty || '',
             godown: order.godown || '',
-            orderCancel: order.orderCancel || '',
+            // orderCancel: order.orderCancel || '',
             actualProductionPlanned: order.actualProductionPlanned || '',
             actualProductionDone: order.actualProductionDone || '',
             planningPendingQty: order.planningPendingQty || '',
             productionPendingQty: order.productionPendingQty || '',
-            dateOfCompletePlanning: order.dateOfCompletePlanning || '',
-            dateOfCompleteProduction: order.dateOfCompleteProduction || '',
             rowIndex: order.rowIndex
           }));
 
@@ -170,13 +165,11 @@ export default function OrderDetails() {
         <td className="px-4 py-3 text-center text-[11px] text-gray-600 whitespace-nowrap">{item.baseCat}</td>
         <td className="px-4 py-3 text-center text-xs text-indigo-600 font-bold whitespace-nowrap">{item.qty}</td>
         <td className="px-4 py-3 text-center text-xs text-slate-700 font-medium whitespace-nowrap">{item.godown}</td>
-        <td className="px-4 py-3 text-center text-xs text-rose-600 font-bold whitespace-nowrap">{item.orderCancel || '-'}</td>
+     
         <td className="px-4 py-3 text-center text-xs text-slate-700 font-semibold whitespace-nowrap">{item.actualProductionPlanned || '-'}</td>
         <td className="px-4 py-3 text-center text-xs text-slate-700 font-semibold whitespace-nowrap">{item.actualProductionDone || '-'}</td>
         <td className="px-4 py-3 text-center text-xs text-slate-700 font-semibold whitespace-nowrap">{item.planningPendingQty || '-'}</td>
         <td className="px-4 py-3 text-center text-xs text-slate-700 font-semibold whitespace-nowrap">{item.productionPendingQty || '-'}</td>
-        <td className="px-4 py-3 text-center text-xs text-slate-600 whitespace-nowrap">{item.dateOfCompletePlanning || '-'}</td>
-        <td className="px-4 py-3 text-center text-xs text-slate-600 whitespace-nowrap">{item.dateOfCompleteProduction || '-'}</td>
       </tr>
     );
   };
