@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Layers, X, Plus, Calendar, Tag, Box, DollarSign, Calculator } from 'lucide-react';
+import { Layers, X, Plus, Calendar, Tag, Box, DollarSign, Calculator, Trash2 } from 'lucide-react';
 import SearchableDropdown from '../../components/SearchableDropdown';
 import ModalForm from '../../components/ModalForm';
 import { SEEDED_ITEMS } from '../../utils/seeds';
@@ -221,7 +221,7 @@ export default function FullKittingForm({ isOpen, onClose, onSave, pendingOrders
         availableQty: availableRawQty,
         indentQty: Number(indentQty.toFixed(4)),
         unit: comp.unit || 'pcs',
-        checked: false
+        checked: true
       };
     });
     setEditedTableData(initial);
@@ -302,7 +302,7 @@ export default function FullKittingForm({ isOpen, onClose, onSave, pendingOrders
         availableQty: 0,
         indentQty: 0,
         unit: 'pcs',
-        checked: false,
+        checked: true,
         isCustom: true
       }
     ]);
@@ -310,13 +310,14 @@ export default function FullKittingForm({ isOpen, onClose, onSave, pendingOrders
 
   // Total summary calculations
   const totals = useMemo(() => {
-    const totalRawCost = editedTableData.reduce((sum, item) => sum + item.rawCost, 0);
+    const activeItems = editedTableData.filter(item => item.checked);
+    const totalRawCost = activeItems.reduce((sum, item) => sum + item.rawCost, 0);
     const extra = Number(extraAmount) || 0;
     const totalProductionCost = totalRawCost + extra;
     const totalSellingPrice = Number(sellingPrice) || 0;
     const profitLoss = totalSellingPrice - totalProductionCost;
     const profitLossPercent = totalProductionCost > 0 ? (profitLoss / totalProductionCost) * 100 : 0;
-    const totalRawRequiredQty = editedTableData.reduce((sum, item) => sum + item.rawQty, 0);
+    const totalRawRequiredQty = activeItems.reduce((sum, item) => sum + item.rawQty, 0);
 
     return {
       totalRawRequiredQty,
@@ -427,6 +428,12 @@ export default function FullKittingForm({ isOpen, onClose, onSave, pendingOrders
       return;
     }
 
+    const hasEmptyCheckedRow = editedTableData.some(row => row.checked && !row.rawName);
+    if (hasEmptyCheckedRow) {
+      toast.error('Please select a material for all checked extra material rows.');
+      return;
+    }
+
     setIsSubmitting(true);
 
     // Generate unique batch ticket ID
@@ -504,17 +511,18 @@ export default function FullKittingForm({ isOpen, onClose, onSave, pendingOrders
 
     try {
       // Prepare materials list
-      const requiredRawMaterialNameList = editedTableData.map(item => item.rawName || '').filter(name => name);
+      const activeTableData = editedTableData.filter(item => item.checked && item.rawName);
+      const requiredRawMaterialNameList = activeTableData.map(item => item.rawName);
 
       if (onSave) {
         // Construct unique, scaled costing data for each matched order individually
         const records = matchedOrders.map(o => {
           const ratio = totalQty > 0 ? (Number(o.qty) || 0) / totalQty : 0;
 
-          const rawQtyList = editedTableData.map(item => (item.rawQty * ratio).toFixed(3));
-          const rawCostList = editedTableData.map(item => (item.rawCost * ratio).toFixed(2));
-          const availableRawQtyList = editedTableData.map(item => (item.availableQty * ratio).toFixed(3));
-          const indentQtyList = editedTableData.map(item => (item.indentQty * ratio).toFixed(3));
+          const rawQtyList = activeTableData.map(item => (item.rawQty * ratio).toFixed(3));
+          const rawCostList = activeTableData.map(item => (item.rawCost * ratio).toFixed(2));
+          const availableRawQtyList = activeTableData.map(item => (item.availableQty * ratio).toFixed(3));
+          const indentQtyList = activeTableData.map(item => (item.indentQty * ratio).toFixed(3));
 
           return {
             sNo: o.sNo,
@@ -651,6 +659,7 @@ export default function FullKittingForm({ isOpen, onClose, onSave, pendingOrders
                           <th className="px-4 py-2.5 text-center">Raw Cost</th>
                           <th className="px-4 py-2.5 text-center">Available Raw Qty</th>
                           <th className="px-4 py-2.5 text-center">Indent Qty</th>
+                          <th className="px-4 py-2.5 text-center w-12">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-indigo-50">
@@ -658,11 +667,11 @@ export default function FullKittingForm({ isOpen, onClose, onSave, pendingOrders
                           editedTableData.map((row, index) => {
                             const isShortage = row.indentQty > 0;
                             return (
-                              <tr key={index} className={`transition-all duration-200 ${row.checked ? 'bg-emerald-50/20 text-slate-400 opacity-60' : 'hover:bg-slate-50/50'}`}>
+                              <tr key={index} className={`transition-all duration-200 ${!row.checked ? 'bg-slate-50/50 text-slate-400 opacity-60' : 'hover:bg-slate-50/50'}`}>
                                 <td className="px-4 py-2.5 text-center">
                                   <input
                                     type="checkbox"
-                                    checked={row.checked || true}
+                                    checked={row.checked}
                                     onChange={(e) => handleCellChange(index, 'checked', e.target.checked)}
                                     className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer transition-transform active:scale-95"
                                     title="Mark as Checked"
@@ -732,12 +741,24 @@ export default function FullKittingForm({ isOpen, onClose, onSave, pendingOrders
                                     {row.indentQty > 0 ? `${row.indentQty.toFixed(3)} ${row.unit}` : 'Nil'}
                                   </span>
                                 </td>
+                                <td className="px-4 py-2.5 text-center">
+                                  {row.isCustom && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteRow(index)}
+                                      className="text-rose-500 hover:text-rose-700 transition-colors duration-150 p-1 rounded hover:bg-rose-50 inline-flex items-center justify-center"
+                                      title="Delete Row"
+                                    >
+                                      <Trash2 size={16} />
+                                    </button>
+                                  )}
+                                </td>
                               </tr>
                             );
                           })
                         ) : (
                           <tr>
-                            <td colSpan="6" className="px-4 py-6 text-center text-slate-400 font-medium bg-slate-50/30">
+                            <td colSpan="7" className="px-4 py-6 text-center text-slate-400 font-medium bg-slate-50/30">
                               No BOM components configured. Click "Add Extra Material" to add custom rows.
                             </td>
                           </tr>
@@ -916,8 +937,8 @@ export default function FullKittingForm({ isOpen, onClose, onSave, pendingOrders
                 </tr>
               </thead>
               <tbody>
-                {editedTableData.length > 0 ? (
-                  editedTableData.map((row, index) => (
+                {editedTableData.filter(row => row.checked).length > 0 ? (
+                  editedTableData.filter(row => row.checked).map((row, index) => (
                     <tr key={index} style={{ borderBottom: '1px solid #e2e8f0', background: index % 2 === 0 ? '#ffffff' : '#fafafa' }}>
                       <td style={{ padding: '8px 12px', border: '1px solid #e2e8f0', fontWeight: '500' }}>{row.rawName}</td>
                       <td style={{ padding: '8px 12px', border: '1px solid #e2e8f0', textAlign: 'center', fontWeight: '700', color: '#6366f1' }}>

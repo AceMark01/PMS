@@ -72,10 +72,9 @@ export default function FullKittingApproval() {
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      const [result, historyResult, kittingResult] = await Promise.all([
+      const [result, historyResult] = await Promise.all([
         productionAPI.getSheetData('PRODUCTION_ORDERS', { headerRow: 6 }),
-        productionAPI.getSheetData('JOB CARD', { headerRow: 6 }),
-        productionAPI.getSheetData('Costing-History')
+        productionAPI.getSheetData('JOB CARD', { headerRow: 6 })
       ]);
       let transformedOrders = [];
       if (result.success) {
@@ -92,6 +91,44 @@ export default function FullKittingApproval() {
           actual1: order.actual1 || ''
         }));
         setOrders(transformedOrders);
+
+        // Map kittingHistory from PRODUCTION_ORDERS records
+        const transformedKitting = result.records
+          .filter(order => order.sNo && order.sNo.toString().trim() !== '')
+          .map(order => {
+            const isActual1Filled = order.actual1 && order.actual1.toString().trim() !== '';
+            const isCheckJcFilled = order.checkJc && order.checkJc.toString().trim() !== '';
+
+            const statusVal = isCheckJcFilled
+              ? (order.checkJc.toLowerCase() === 'rejected' ? 'Rejected' : 'Approved')
+              : (isActual1Filled ? 'Pending' : 'Draft');
+
+            return {
+              id: order.sNo?.toString() || `po-${order.sNo}`,
+              rowIndex: order.rowIndex,
+              kittingTicket: order.costingImage ? 'KT-VERIFIED' : '',
+              sNo: order.sNo,
+              timestamp: order.timestamp,
+              productCode: order.productCode || '',
+              productName: order.productName || '',
+              baseCat: order.baseCat || '',
+              qty: Number(order.qty) || 0,
+              rawNames: order.rawNames || '',
+              rawQuantities: order.rawQuantities || '',
+              fgAvailableQty: parseStringToNumber(order.fGAvailableQty || order.fgAvailableQty || 0),
+              totalRawRequiredQty: parseStringToNumber(order.totalRawRequiredQty || 0),
+              totalRawCost: parseStringToNumber(order.totalRawCost || 0),
+              extraAmount: parseStringToNumber(order.extraAmount || 0),
+              totalProductionCost: parseStringToNumber(order.totalProductionCost || 0),
+              sellingPrice: parseStringToNumber(order.sellingPrice || 0),
+              profitLoss: parseStringToNumber(order.profitLoss !== undefined ? order.profitLoss : (order['profit/LossAmount'] || 0)),
+              profitLossPercent: parseStringToNumber(order.profitLossPercent !== undefined ? order.profitLossPercent : (order['profit/Loss%'] || 0)),
+              pdfLink: order.costingImage || '',
+              costingImage: order.costingImage || '',
+              status: statusVal
+            };
+          });
+        setKittingHistory(transformedKitting);
       } else {
         toast.error(`Failed to load orders: ${result.error}`);
       }
@@ -101,44 +138,6 @@ export default function FullKittingApproval() {
         setHistoryRecords(historyResult.records);
       } else {
         toast.error(`Failed to load approval history: ${historyResult.error}`);
-      }
-
-      if (kittingResult.success) {
-        const transformedKitting = (kittingResult.records || []).map(record => {
-          const firstSNo = String(record.sNo).split(',')[0]?.trim();
-          const matchedOrder = transformedOrders.find(o => String(o.sNo).trim() === firstSNo);
-
-          return {
-            id: record.rowIndex?.toString() || `hist-${record.sNo}`,
-            rowIndex: record.rowIndex,
-            kittingTicket: record.kittingTicket || '',
-            sNo: record.sNo,
-            timestamp: record.timestamp,
-            productCode: matchedOrder ? matchedOrder.productCode : '',
-            productName: matchedOrder ? matchedOrder.productName : (record.fGName || record.fgName || ''),
-            baseCat: matchedOrder ? matchedOrder.baseCat : '',
-            qty: parseStringToNumber(record.planQty || record.qty || (matchedOrder ? matchedOrder.qty : 0)),
-            rawNames: record.requiredRawMaterialName || record.rawNames || '',
-            rawQuantities: record.rawQty || record.rawQuantities || '',
-            fgAvailableQty: parseStringToNumber(record.fGAvailableQty || record.fgAvailableQty || 0),
-            totalRawRequiredQty: parseStringToNumber(record.totalRawRequiredQty || 0),
-            totalRawCost: parseStringToNumber(record.totalRawCost || 0),
-            extraAmount: parseStringToNumber(record.extraAmount || 0),
-            totalProductionCost: parseStringToNumber(record.totalProductionCost || 0),
-            sellingPrice: parseStringToNumber(record.sellingPrice || 0),
-            profitLoss: parseStringToNumber(record.profitLoss !== undefined ? record.profitLoss : (record['profit/LossAmount'] || 0)),
-            profitLossPercent: parseStringToNumber(record.profitLossPercent !== undefined ? record.profitLossPercent : (record['profit/Loss%'] || 0)),
-            pdfLink: record.pdfLink || record.pDFLink || record.costingImage || record.__rowValues?.[18] || '',
-            status: matchedOrder
-              ? (matchedOrder.checkJc
-                ? (matchedOrder.checkJc.toLowerCase() === 'rejected' ? 'Rejected' : 'Approved')
-                : (matchedOrder.actual1 ? 'Pending' : 'Draft'))
-              : 'Pending'
-          };
-        });
-        setKittingHistory(transformedKitting);
-      } else {
-        toast.error(`Failed to load costing history: ${kittingResult.error}`);
       }
     } catch (err) {
       console.error(err);
