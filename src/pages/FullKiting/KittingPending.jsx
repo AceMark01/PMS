@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import DataTable from '../../components/DataTable';
 
-export default function KittingPending({ data, visibleColumns = [] }) {
+export default function KittingPending({ data, visibleColumns = [], onOpenForm }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
 
@@ -12,14 +12,22 @@ export default function KittingPending({ data, visibleColumns = [] }) {
   );
 
   const allHeaders = [
-    "S NO", "Timestamp", "Product code", "Product Name", "BAse Cat", "Order Quantity", "GoDown", "Planned 1"
+    "Action", "S NO", "Timestamp", "Product code", "Product Name", "BAse Cat", "Order Quantity", "GoDown", "Planned 1"
   ];
 
-  const tableHeaders = allHeaders.filter(h => visibleColumns.includes(h));
+  const tableHeaders = allHeaders.filter(h => h === "Action" || visibleColumns.includes(h));
 
   const renderRow = (item, idx) => {
     return (
       <tr key={item.id || idx} className="hover:bg-indigo-50/30 transition-colors border-b border-gray-100">
+        <td className="px-4 py-3 text-center text-xs whitespace-nowrap">
+          <button
+            onClick={() => onOpenForm && onOpenForm(item.id)}
+            className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded text-[11px] font-bold uppercase transition active:scale-95 border border-indigo-200 cursor-pointer"
+          >
+            Process
+          </button>
+        </td>
         <td className="px-4 py-3 text-center text-xs text-gray-600 whitespace-nowrap">{item.sNo}</td>
         <td className="px-4 py-3 text-center text-xs text-gray-500 whitespace-nowrap">{item.timestamp}</td>
         <td className="px-4 py-3 text-center text-xs text-indigo-600 font-bold whitespace-nowrap">{item.productCode}</td>
@@ -44,6 +52,12 @@ export default function KittingPending({ data, visibleColumns = [] }) {
             </span>
             <span className="text-xs font-bold text-gray-900 uppercase">{item.productName}</span>
           </div>
+          <button
+            onClick={() => onOpenForm && onOpenForm(item.id)}
+            className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-[10px] font-bold uppercase transition active:scale-95 shadow-sm cursor-pointer"
+          >
+            Process
+          </button>
         </div>
 
         <div className="grid grid-cols-2 gap-2 text-[11px] bg-slate-50 rounded-lg p-2 border border-slate-100/50">

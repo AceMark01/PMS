@@ -330,6 +330,7 @@ export default function FullKitting() {
           <KittingPending
             data={filteredPendingOrders}
             visibleColumns={visibleColumns}
+            onOpenForm={handleOpenKittingForm}
           />
         ) : (
           <KittingHistory

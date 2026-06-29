@@ -18,6 +18,7 @@ export default function FullKittingForm({ isOpen, onClose, onSave, pendingOrders
 
   const [rawMaterials, setRawMaterials] = useState([]);
   const [inventoryList, setInventoryList] = useState([]);
+  const [substituteBOMs, setSubstituteBOMs] = useState([]);
   const [loadingBOM, setLoadingBOM] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -29,9 +30,10 @@ export default function FullKittingForm({ isOpen, onClose, onSave, pendingOrders
       const loadData = async () => {
         setLoadingBOM(true);
         try {
-          const [bomResult, invResult] = await Promise.all([
+          const [bomResult, invResult, subResult] = await Promise.all([
             productionAPI.getSheetData('BOM'),
-            productionAPI.getSheetData('Live IMS')
+            productionAPI.getSheetData('Live IMS'),
+            productionAPI.getSheetData('Substitute-BOM')
           ]);
           if (bomResult.success) {
             setRawMaterials(bomResult.records || []);
@@ -44,6 +46,12 @@ export default function FullKittingForm({ isOpen, onClose, onSave, pendingOrders
           } else {
             console.error('Failed to fetch Live IMS:', invResult.error);
             toast.error('Failed to fetch Live IMS data');
+          }
+          if (subResult.success) {
+            setSubstituteBOMs(subResult.records || []);
+          } else {
+            console.error('Failed to fetch Substitute-BOM:', subResult.error);
+            toast.error('Failed to fetch Substitute-BOM data');
           }
         } catch (err) {
           console.error('Error loading data:', err);
@@ -206,26 +214,79 @@ export default function FullKittingForm({ isOpen, onClose, onSave, pendingOrders
       return;
     }
 
-    const initial = bomComponents.map(comp => {
-      const rawQty = (Number(comp.qty) || 0) * totalQty;
-      const rawCost = rawQty * (Number(comp.costPerUnit) || 0);
-      const availableRawQty = Number(comp.qtyFromRaw) || 0;
-      const indentQty = Math.max(0, rawQty - availableRawQty);
+    setEditedTableData(prev => {
+      // Find if we already have a substitute row in prev
+      const prevSub = prev.find(r => r.isSubstitute);
+      let selectedSub = substituteBOMs[0];
+      let isSubChecked = true;
+      let userAvailableQty = null;
 
-      return {
-        rawName: comp.rawItemName,
-        itemCode: comp.itemCode,
-        rawQty: Number(rawQty.toFixed(4)),
-        costPerUnit: Number(comp.costPerUnit) || 0,
-        rawCost: Number(rawCost.toFixed(2)),
-        availableQty: availableRawQty,
-        indentQty: Number(indentQty.toFixed(4)),
-        unit: comp.unit || 'pcs',
-        checked: true
-      };
+      if (prevSub && substituteBOMs.length > 0) {
+        const found = substituteBOMs.find(s => s.rawItemName === prevSub.rawName);
+        if (found) {
+          selectedSub = found;
+          isSubChecked = prevSub.checked;
+          userAvailableQty = prevSub.availableQty;
+        }
+      }
+
+      const initial = bomComponents.map(comp => {
+        // Look up if we had modified this row's availableQty in prev
+        const prevRow = prev.find(r => r.itemCode === comp.itemCode && !r.isSubstitute && !r.isCustom);
+        const availableRawQty = prevRow ? prevRow.availableQty : (Number(comp.qtyFromRaw) || 0);
+        const isChecked = prevRow ? prevRow.checked : true;
+
+        const rawQty = (Number(comp.qty) || 0) * totalQty;
+        const rawCost = rawQty * (Number(comp.costPerUnit) || 0);
+        const indentQty = Math.max(0, rawQty - availableRawQty);
+
+        return {
+          rawName: comp.rawItemName,
+          itemCode: comp.itemCode,
+          rawQty: Number(rawQty.toFixed(4)),
+          costPerUnit: Number(comp.costPerUnit) || 0,
+          rawCost: Number(rawCost.toFixed(2)),
+          availableQty: availableRawQty,
+          indentQty: Number(indentQty.toFixed(4)),
+          unit: comp.unit || 'pcs',
+          checked: isChecked
+        };
+      });
+
+      // Carry forward custom rows from prev
+      prev.filter(r => r.isCustom).forEach(customRow => {
+        initial.push(customRow);
+      });
+
+      if (selectedSub) {
+        // Look up availableRawQty from rawMaterials (matching by itemCode or rawItemName)
+        const matchedMaterial = rawMaterials.find(
+          rm => (rm.itemCode && rm.itemCode === selectedSub.itemCode) || 
+                (rm.rawItemName && rm.rawItemName === selectedSub.rawItemName)
+        );
+        const availableRawQty = userAvailableQty !== null ? userAvailableQty : (matchedMaterial ? (Number(matchedMaterial.qtyFromRaw) || 0) : 0);
+        
+        const rawQty = (Number(selectedSub.qty) || 0) * totalQty;
+        const rawCost = rawQty * (Number(selectedSub.costPerUnit) || 0);
+        const indentQty = Math.max(0, rawQty - availableRawQty);
+
+        initial.push({
+          rawName: selectedSub.rawItemName,
+          itemCode: selectedSub.itemCode,
+          rawQty: Number(rawQty.toFixed(4)),
+          costPerUnit: Number(selectedSub.costPerUnit) || 0,
+          rawCost: Number(rawCost.toFixed(2)),
+          availableQty: availableRawQty,
+          indentQty: Number(indentQty.toFixed(4)),
+          unit: selectedSub.unit || 'pcs',
+          checked: isSubChecked,
+          isSubstitute: true
+        });
+      }
+
+      return initial;
     });
-    setEditedTableData(initial);
-  }, [selectedOrder, bomComponents, totalQty]);
+  }, [selectedOrder, bomComponents, totalQty, substituteBOMs, rawMaterials]);
 
   // Auto-calculate Extra Amount as 10% of Total Raw Material Cost (unless manually edited)
   const totalRawCostVal = useMemo(() => {
@@ -278,6 +339,43 @@ export default function FullKittingForm({ isOpen, onClose, onSave, pendingOrders
           rawCost: Number((row.rawQty * costVal).toFixed(2)),
           indentQty: Number(Math.max(0, row.rawQty - row.availableQty).toFixed(4)),
           checked: false
+        };
+      }
+      return row;
+    });
+    setEditedTableData(updated);
+  };
+
+  const handleSelectSubstituteMaterial = (index, name) => {
+    const material = substituteBOMs.find(rm => rm.rawItemName === name);
+    if (!material) return;
+
+    // Look up available quantity from rawMaterials (matching by itemCode or rawItemName)
+    const matchedMaterial = rawMaterials.find(
+      rm => (rm.itemCode && rm.itemCode === material.itemCode) || 
+            (rm.rawItemName && rm.rawItemName === material.rawItemName)
+    );
+    const availableQtyVal = matchedMaterial ? (Number(matchedMaterial.qtyFromRaw) || 0) : 0;
+
+    const updated = editedTableData.map((row, idx) => {
+      if (idx === index) {
+        const costVal = Number(material.costPerUnit) || 0;
+        const codeVal = material.itemCode || 'CUSTOM';
+        const unitVal = material.unit || 'pcs';
+        const rawQtyVal = (Number(material.qty) || 0) * totalQty;
+        const rawCostVal = rawQtyVal * costVal;
+        
+        return {
+          ...row,
+          rawName: name,
+          itemCode: codeVal,
+          costPerUnit: costVal,
+          unit: unitVal,
+          rawQty: Number(rawQtyVal.toFixed(4)),
+          rawCost: Number(rawCostVal.toFixed(2)),
+          availableQty: availableQtyVal,
+          indentQty: Number(Math.max(0, rawQtyVal - availableQtyVal).toFixed(4)),
+          checked: true
         };
       }
       return row;
@@ -678,11 +776,22 @@ export default function FullKittingForm({ isOpen, onClose, onSave, pendingOrders
                                   />
                                 </td>
                                 <td className="px-4 py-2.5 text-center font-medium text-slate-900">
-                                  {row.isCustom ? (
+                                  {row.isSubstitute ? (
+                                    <select
+                                      value={row.rawName}
+                                      onChange={(e) => handleSelectSubstituteMaterial(index, e.target.value)}
+                                      className="w-full max-w-[200px] px-2 py-1 border border-indigo-200 rounded text-center focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 text-xs font-bold text-indigo-700 bg-indigo-50/30 inline-block cursor-pointer"
+                                      required
+                                    >
+                                      {substituteBOMs.map((m, mIdx) => (
+                                        <option key={mIdx} value={m.rawItemName}>{m.rawItemName}</option>
+                                      ))}
+                                    </select>
+                                  ) : row.isCustom ? (
                                     <select
                                       value={row.rawName}
                                       onChange={(e) => handleSelectRawMaterial(index, e.target.value)}
-                                      className="w-full max-w-[200px] px-2 py-1 border border-gray-200 rounded text-center focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 text-xs font-semibold text-slate-800 bg-white inline-block"
+                                      className="w-full max-w-[200px] px-2 py-1 border border-gray-200 rounded text-center focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 text-xs font-semibold text-slate-800 bg-white inline-block cursor-pointer"
                                       required
                                     >
                                       <option value="">-- Select Material --</option>

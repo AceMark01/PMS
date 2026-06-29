@@ -12,6 +12,7 @@ const formatDate = (date) => {
 
 export default function ActualProductionForm({ isOpen, onClose, onSubmitProduction, record, bomRecords, inventoryRecords }) {
   const [dateOfProduction, setDateOfProduction] = useState('');
+  const [productionQty, setProductionQty] = useState('');
   const [editedRaws, setEditedRaws] = useState([]);
 
   // Load unique raw materials list for dropdown options from pre-fetched bom and inventory records
@@ -39,13 +40,16 @@ export default function ActualProductionForm({ isOpen, onClose, onSubmitProducti
     return Array.from(unique).sort();
   }, [bomRecords, inventoryRecords]);
 
-  // Set default date to today in YYYY-MM-DD
+  // Set default date and production quantity
   useEffect(() => {
     if (isOpen) {
       const today = new Date().toISOString().split('T')[0];
       setDateOfProduction(today);
+      if (record) {
+        setProductionQty(record.qty || '');
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, record]);
 
   // Load and parse initial raw materials from kitting record (JOB CARD columns J-AC)
   useEffect(() => {
@@ -133,8 +137,8 @@ export default function ActualProductionForm({ isOpen, onClose, onSubmitProducti
       sNo: record.sNo,
       productCode: record.productCode,
       productName: record.productName,
-      qty: Number(record.qty) || 0,
-      productionQuantity: Number(record.qty) || 0,
+      qty: Number(productionQty) || 0,
+      productionQuantity: Number(productionQty) || 0,
       dateOfProduction,
       approvalStatus: record.status || 'Approved',
       approvalRemarks: record.remarks || '',
@@ -216,16 +220,29 @@ export default function ActualProductionForm({ isOpen, onClose, onSubmitProducti
           </div>
         </div>
 
-        {/* Date of Production Input */}
-        <div className="bg-white p-3 rounded-lg border border-slate-100 shadow-xs">
-          <label className="block text-[11px] md:text-[13px] text-gray-700 uppercase tracking-tight font-bold mb-1.5">Date Of Production *</label>
-          <div className="relative">
-            <Calendar className="absolute left-2.5 top-[9px] text-gray-400" size={14} />
+        {/* Date of Production & Production Qty Input */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-3 rounded-lg border border-slate-100 shadow-xs">
+          <div>
+            <label className="block text-[11px] md:text-[13px] text-gray-700 uppercase tracking-tight font-bold mb-1.5">Date Of Production *</label>
+            <div className="relative">
+              <Calendar className="absolute left-2.5 top-[9px] text-gray-400" size={14} />
+              <input
+                type="date"
+                value={dateOfProduction}
+                onChange={(e) => setDateOfProduction(e.target.value)}
+                className="w-full pl-8 pr-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500 text-xs h-[36px]"
+                required
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-[11px] md:text-[13px] text-gray-700 uppercase tracking-tight font-bold mb-1.5">Production Qty *</label>
             <input
-              type="date"
-              value={dateOfProduction}
-              onChange={(e) => setDateOfProduction(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500 text-xs h-[36px]"
+              type="number"
+              min="0"
+              value={productionQty}
+              onChange={(e) => setProductionQty(e.target.value)}
+              className="w-full px-3 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500 text-xs h-[36px] font-bold text-indigo-600 bg-white"
               required
             />
           </div>
