@@ -50,9 +50,9 @@ const Sidebar = ({ isOpen, onClose }) => {
     { path: '/dashboard',           icon: TrendingUp,     label: 'Dashboard' },
     { path: '/inventory',           icon: Package,        label: 'Inventory' },
     { path: '/bom',                 icon: LayoutGrid,     label: 'BOM' },
+    { path: '/indent',              icon: ShoppingCart,   label: 'Indent' },
     { path: '/production-orders',   icon: ClipboardList,  label: 'Order of Production' },
     { path: '/full-kitting',        icon: Blocks,         label: 'Full Kitting' },
-    { path: '/full-kitting-approval',icon: ShieldCheck,    label: 'Kitting Approval' },
     { path: '/actual-production',   icon: ClipboardCheck, label: 'Actual Production' },
     { path: '/testing',             icon: CheckCircle,    label: 'Testing' },
     { path: '/settings',            icon: Settings,       label: 'Settings' },
@@ -61,9 +61,9 @@ const Sidebar = ({ isOpen, onClose }) => {
   const employeeMenuItems = [
     { path: '/inventory',         icon: Package,        label: 'Inventory' },
     { path: '/bom',               icon: LayoutGrid,     label: 'BOM' },
+    { path: '/indent',            icon: ShoppingCart,   label: 'Indent' },
     { path: '/production-orders', icon: ClipboardList,  label: 'Order of Production' },
     { path: '/full-kitting',      icon: Blocks,         label: 'Full Kitting' },
-    { path: '/full-kitting-approval',icon: ShieldCheck,    label: 'Kitting Approval' },
     { path: '/actual-production',   icon: ClipboardCheck, label: 'Actual Production' },
     { path: '/testing',             icon: CheckCircle,    label: 'Testing' },
   ];

@@ -21,7 +21,7 @@ export default function Testing() {
   const [loading, setLoading] = useState(true);
 
   const pendingToggleableHeaders = useMemo(() => [
-    "Timestamp", "JC-Job Card", "S NO", "ProductCode", "ProductName", "Order Quantity", "Date Of Production", "Approval Status", "Approval Remarks",
+    "Timestamp", "JC-Job Card", "S NO", "ProductCode", "ProductName", "Order Quantity", "Date Of Production", "Planned 3",
     "Raw Name1", "Raw Name2", "Raw Name3", "Raw Name4", "Raw Name5", "Raw Name6", "Raw Name7", "Raw Name8", "Raw Name9", "Raw Name10",
     "Raw Qty1", "Raw Qty2", "Raw Qty3", "Raw Qty4", "Raw Qty5", "Raw Qty6", "Raw Qty7", "Raw Qty8", "Raw Qty9", "Raw Qty10"
   ], []);
@@ -33,7 +33,7 @@ export default function Testing() {
   ], []);
 
   const [visibleColumns, setVisibleColumns] = useState([
-    "Timestamp", "JC-Job Card", "S NO", "ProductCode", "ProductName", "Order Quantity", "Date Of Production", "Approval Status", "Approval Remarks", "Testing Date", "Testing Status", "Testing Remarks",
+    "Timestamp", "JC-Job Card", "S NO", "ProductCode", "ProductName", "Order Quantity", "Date Of Production", "Planned 3", "Testing Date", "Testing Status", "Testing Remarks",
     "Raw Name1", "Raw Name2", "Raw Name3", "Raw Name4", "Raw Name5", "Raw Name6", "Raw Name7", "Raw Name8", "Raw Name9", "Raw Name10",
     "Raw Qty1", "Raw Qty2", "Raw Qty3", "Raw Qty4", "Raw Qty5", "Raw Qty6", "Raw Qty7", "Raw Qty8", "Raw Qty9", "Raw Qty10"
   ]);
@@ -46,14 +46,9 @@ export default function Testing() {
     );
   };
 
-  // Load and manage job card logs (fetched from sheet)
-  const [jobCardHistory, setJobCardHistory] = useState([]);
-
   // Load and manage actual production logs (fetched from sheet)
+  const [jobCardHistory, setJobCardHistory] = useState([]);
   const [actualProductionHistory, setActualProductionHistory] = useState([]);
-
-
-
   const [searchQuery, setSearchQuery] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
@@ -61,42 +56,23 @@ export default function Testing() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [jobCardResult, prodResult] = await Promise.all([
-        productionAPI.getSheetData('JOB CARD', { headerRow: 6 }),
-        productionAPI.getSheetData('ACTUAL PRODUCTION', { headerRow: 6 })
-      ]);
+      const result = await productionAPI.getSheetData('ACTUAL PRODUCTION', { headerRow: 6 });
 
-      if (jobCardResult.success) {
-        const transformedJobCards = jobCardResult.records.map(record => ({
-          id: record.rowIndex?.toString() || `jc-${record.sNo}`,
+      if (result.success) {
+        const transformedOrders = result.records.map(record => ({
+          id: record.rowIndex?.toString() || `ap-${record.sNo}`,
           rowIndex: record.rowIndex,
           jobCardNo: record.jCJobCard || record['jC-JobCard'] || record.jcJobCard || record.jobCardNo || '',
           sNo: record.sNo,
           timestamp: record.timestamp,
           productCode: record.productCode || '',
           productName: record.productName || '',
-          qty: Number(record.qty) || 0,
+          qty: Number(record.productionQuantity !== undefined ? record.productionQuantity : (record.qty || 0)),
           dateOfProduction: record.dateOfProduction || '',
-          status: record.approvalStatus || 'Approved',
-          remarks: record.approvalRemarks || '',
-          __rowValues: record.__rowValues
-        }));
-        setJobCardHistory(transformedJobCards);
-      } else {
-        toast.error(`Failed to load job cards from JOB CARD: ${jobCardResult.error}`);
-      }
-
-      if (prodResult.success) {
-        const transformedHistory = prodResult.records.map(record => ({
-          id: record.rowIndex?.toString() || `prod-${record.sNo}`,
-          rowIndex: record.rowIndex,
-          jobCardNo: record.jCJobCard || record['jC-JobCard'] || record.jcJobCard || record.jobCardNo || '',
-          sNo: record.sNo,
-          timestamp: record.timestamp,
-          productCode: record.productCode || '',
-          productName: record.productName || '',
-          qty: Number(record.qty) || 0,
-          dateOfProduction: record.dateOfProduction || '',
+          planned3: record.planned3 || '',
+          actual3: record.actual3 || '',
+          status3: record.status3 || '',
+          remarks: record.remarks || '',
           rawName1: record.rawName1 || '',
           rawQty1: record.rawQty1 || '',
           rawName2: record.rawName2 || '',
@@ -117,13 +93,11 @@ export default function Testing() {
           rawQty9: record.rawQty9 || '',
           rawName10: record.rawName10 || '',
           rawQty10: record.rawQty10 || '',
-          approvalStatus: record.approvalStatus || 'Approved',
-          approvalRemarks: record.approvalRemarks || '',
           __rowValues: record.__rowValues
         }));
-        setActualProductionHistory(transformedHistory);
+        setJobCardHistory(transformedOrders);
       } else {
-        toast.error(`Failed to load actual production logs: ${prodResult.error}`);
+        toast.error(`Failed to load actual production logs: ${result.error}`);
       }
     } catch (err) {
       console.error(err);
@@ -137,112 +111,30 @@ export default function Testing() {
     fetchData();
   }, []);
 
-  // Filter approved costing cards that are not yet in production history
+  // Filter pending testing records based on planned3 and actual3 in ACTUAL PRODUCTION
   const pendingTesting = useMemo(() => {
-    const pendingJobCards = jobCardHistory.filter(row => {
-      const valAJ = row.__rowValues && row.__rowValues[35];
-      const hasAJ = valAJ !== undefined && valAJ !== null && valAJ.toString().trim() !== '';
-
-      const valAK = row.__rowValues && row.__rowValues[36];
-      const hasAK = valAK !== undefined && valAK !== null && valAK.toString().trim() !== '';
-
-      return hasAJ && !hasAK;
+    return jobCardHistory.filter(row => {
+      const hasPlanned3 = row.planned3 !== undefined && row.planned3 !== null && row.planned3.toString().trim() !== '';
+      const hasActual3 = row.actual3 !== undefined && row.actual3 !== null && row.actual3.toString().trim() !== '';
+      return hasPlanned3 && !hasActual3;
     });
+  }, [jobCardHistory]);
 
-    return pendingJobCards.map(jc => {
-      const firstSNo = String(jc.sNo).split(',')[0]?.trim();
-      const matchedProd = actualProductionHistory.find(
-        ap => String(ap.sNo).trim().split(',')[0]?.trim() === firstSNo
-      );
-
-      if (matchedProd) {
-        return {
-          ...matchedProd,
-          id: jc.id,
-          rowIndex: jc.rowIndex
-        };
-      }
-
-      return {
-        id: jc.id,
-        rowIndex: jc.rowIndex,
-        jobCardNo: jc.jobCardNo,
-        sNo: jc.sNo,
-        timestamp: jc.timestamp,
-        productCode: jc.productCode,
-        productName: jc.productName,
-        qty: jc.qty,
-        dateOfProduction: jc.dateOfProduction,
-        approvalStatus: jc.status,
-        approvalRemarks: jc.remarks,
-        rawName1: '', rawQty1: '',
-        rawName2: '', rawQty2: '',
-        rawName3: '', rawQty3: '',
-        rawName4: '', rawQty4: '',
-        rawName5: '', rawQty5: '',
-        rawName6: '', rawQty6: '',
-        rawName7: '', rawQty7: '',
-        rawName8: '', rawQty8: '',
-        rawName9: '', rawQty9: '',
-        rawName10: '', rawQty10: '',
-      };
-    });
-  }, [jobCardHistory, actualProductionHistory]);
-
-  // Filter testing history logs directly from jobCardHistory
+  // Filter testing history logs directly from jobCardHistory based on planned3 and actual3 in ACTUAL PRODUCTION
   const testingHistory = useMemo(() => {
-    const historyJobCards = jobCardHistory.filter(row => {
-      const valAJ = row.__rowValues && row.__rowValues[35];
-      const hasAJ = valAJ !== undefined && valAJ !== null && valAJ.toString().trim() !== '';
-
-      const valAK = row.__rowValues && row.__rowValues[36];
-      const hasAK = valAK !== undefined && valAK !== null && valAK.toString().trim() !== '';
-
-      return hasAJ && hasAK;
-    });
-
-    return historyJobCards.map(jc => {
-      const firstSNo = String(jc.sNo).split(',')[0]?.trim();
-      const matchedProd = actualProductionHistory.find(
-        ap => String(ap.sNo).trim().split(',')[0]?.trim() === firstSNo
-      );
-
-      const actual2 = jc.__rowValues && jc.__rowValues[36];
-      const status2 = jc.__rowValues && jc.__rowValues[38];
-      const remarks = jc.__rowValues && jc.__rowValues[39];
-
-      const baseRecord = matchedProd || {
-        productCode: jc.productCode,
-        productName: jc.productName,
-        qty: jc.qty,
-        dateOfProduction: jc.dateOfProduction,
-        approvalStatus: jc.status,
-        approvalRemarks: jc.remarks,
-        rawName1: '', rawQty1: '',
-        rawName2: '', rawQty2: '',
-        rawName3: '', rawQty3: '',
-        rawName4: '', rawQty4: '',
-        rawName5: '', rawQty5: '',
-        rawName6: '', rawQty6: '',
-        rawName7: '', rawQty7: '',
-        rawName8: '', rawQty8: '',
-        rawName9: '', rawQty9: '',
-        rawName10: '', rawQty10: '',
-      };
-
-      return {
-        ...baseRecord,
-        id: jc.id,
-        rowIndex: jc.rowIndex,
-        jobCardNo: jc.jobCardNo,
-        sNo: jc.sNo,
-        timestamp: jc.timestamp,
-        testingDate: actual2 || '',
-        testingStatus: status2 || 'Approved',
-        testingRemarks: remarks || ''
-      };
-    });
-  }, [jobCardHistory, actualProductionHistory]);
+    return jobCardHistory
+      .filter(row => {
+        const hasPlanned3 = row.planned3 !== undefined && row.planned3 !== null && row.planned3.toString().trim() !== '';
+        const hasActual3 = row.actual3 !== undefined && row.actual3 !== null && row.actual3.toString().trim() !== '';
+        return hasPlanned3 && hasActual3;
+      })
+      .map(row => ({
+        ...row,
+        testingDate: row.actual3 || '',
+        testingStatus: row.status3 || 'Approved',
+        testingRemarks: row.remarks || ''
+      }));
+  }, [jobCardHistory]);
 
   // Filter pending items by search query
   const filteredPending = useMemo(() => {
@@ -306,17 +198,17 @@ export default function Testing() {
         String(jc.rowIndex) === String(recordId)
       );
       if (!jcRecord) {
-        toast.error('Job Card record not found');
+        toast.error('Production record not found');
         return;
       }
 
-      const actual2 = formatDate(new Date());
+      const actual3 = formatDate(new Date());
 
-      // Update only columns AK (37), AM (39), and AN (40) to preserve other columns and formulas
+      // Update columns AB (28), AD (30), and AE (31) of ACTUAL PRODUCTION
       const result = await Promise.all([
-        productionAPI.updateCell('JOB CARD', jcRecord.rowIndex, 37, actual2),
-        productionAPI.updateCell('JOB CARD', jcRecord.rowIndex, 39, testingRecord.testingStatus),
-        productionAPI.updateCell('JOB CARD', jcRecord.rowIndex, 40, testingRecord.testingRemarks || '')
+        productionAPI.updateCell('ACTUAL PRODUCTION', jcRecord.rowIndex, 28, actual3),
+        productionAPI.updateCell('ACTUAL PRODUCTION', jcRecord.rowIndex, 30, testingRecord.testingStatus),
+        productionAPI.updateCell('ACTUAL PRODUCTION', jcRecord.rowIndex, 31, testingRecord.testingRemarks || '')
       ]);
 
       const allSuccess = result.every(res => res.success);
@@ -337,22 +229,19 @@ export default function Testing() {
   };
 
   const handleDeleteHistory = async (historyId) => {
-    const jcRecord = jobCardHistory.find(jc => 
-      String(jc.id) === String(historyId) || 
-      String(jc.rowIndex) === String(historyId)
-    );
-    if (!jcRecord) {
-      toast.error('Job Card record not found');
+    const record = testingHistory.find(h => h.id === historyId);
+    if (!record) {
+      toast.error('Testing record not found');
       return;
     }
     if (window.confirm('Are you sure you want to delete this testing record? This will revert the record back to Pending Testing.')) {
       setLoading(true);
       try {
-        // Clear only columns AK (37), AM (39), and AN (40) to revert, keeping all other formulas intact
+        // Clear columns AB (28), AD (30), and AE (31) of ACTUAL PRODUCTION
         const result = await Promise.all([
-          productionAPI.updateCell('JOB CARD', jcRecord.rowIndex, 37, ''),
-          productionAPI.updateCell('JOB CARD', jcRecord.rowIndex, 39, ''),
-          productionAPI.updateCell('JOB CARD', jcRecord.rowIndex, 40, '')
+          productionAPI.updateCell('ACTUAL PRODUCTION', record.rowIndex, 28, ''),
+          productionAPI.updateCell('ACTUAL PRODUCTION', record.rowIndex, 30, ''),
+          productionAPI.updateCell('ACTUAL PRODUCTION', record.rowIndex, 31, '')
         ]);
 
         const allSuccess = result.every(res => res.success);

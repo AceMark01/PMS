@@ -126,14 +126,15 @@ export default function ActualProductionForm({ isOpen, onClose, onSubmitProducti
     const productionRecord = {
       id: `ap-${Date.now()}`,
       timestamp: formatDate(new Date()),
-      jobCardNo: record.jobCardNo || `JC-${record.sNo}`,
-      jCJobCard: record.jobCardNo || `JC-${record.sNo}`,
-      'jC-JobCard': record.jobCardNo || `JC-${record.sNo}`,
-      jcJobCard: record.jobCardNo || `JC-${record.sNo}`,
+      jobCardNo: '',
+      jCJobCard: '',
+      'jC-JobCard': '',
+      jcJobCard: '',
       sNo: record.sNo,
       productCode: record.productCode,
       productName: record.productName,
       qty: Number(record.qty) || 0,
+      productionQuantity: Number(record.qty) || 0,
       dateOfProduction,
       approvalStatus: record.status || 'Approved',
       approvalRemarks: record.remarks || '',
@@ -183,7 +184,7 @@ export default function ActualProductionForm({ isOpen, onClose, onSubmitProducti
             <div>
               <span className="text-gray-400 block uppercase text-[9px] font-bold">JC-Job Card</span>
               <span className="text-indigo-600 font-extrabold uppercase bg-indigo-50 px-2 py-0.5 rounded text-[11px] border border-indigo-100 inline-block">
-                {record.jobCardNo || `JC-${record.sNo}`}
+                (Auto Generated)
               </span>
             </div>
             <div>

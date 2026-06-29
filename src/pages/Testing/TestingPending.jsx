@@ -21,8 +21,7 @@ export default function TestingPending({ data, onOpenTestingForm, visibleColumns
     "ProductName",
     "Order Quantity",
     "Date Of Production",
-    "Approval Status",
-    "Approval Remarks",
+    "Planned 3",
     "Raw Name1",
     "Raw Name2",
     "Raw Name3",
@@ -79,14 +78,8 @@ export default function TestingPending({ data, onOpenTestingForm, visibleColumns
         <td className="px-4 py-3 text-center text-xs text-slate-800 font-semibold">{item.qty} pcs</td>
         {/* Date Of Production */}
         <td className="px-4 py-3 text-center text-xs text-slate-700 font-bold whitespace-nowrap">{item.dateOfProduction}</td>
-        {/* Approval Status */}
-        <td className="px-4 py-3 text-center text-xs whitespace-nowrap">
-          <span className="px-2.5 py-1 rounded bg-emerald-100 text-emerald-800 border border-emerald-200 text-[10px] font-black uppercase tracking-wider">
-            {item.approvalStatus}
-          </span>
-        </td>
-        {/* Approval Remarks */}
-        <td className="px-4 py-3 text-center text-xs text-gray-505 min-w-[150px] whitespace-normal break-words">{item.approvalRemarks || '-'}</td>
+        {/* Planned 3 */}
+        <td className="px-4 py-3 text-center text-xs text-slate-700 font-bold whitespace-nowrap">{item.planned3 || '-'}</td>
         
         {/* Raw Names 1-10 */}
         <td className="px-4 py-3 text-center text-[11px] text-slate-600 whitespace-nowrap">{item.rawName1 || '-'}</td>
@@ -100,17 +93,17 @@ export default function TestingPending({ data, onOpenTestingForm, visibleColumns
         <td className="px-4 py-3 text-center text-[11px] text-slate-600 whitespace-nowrap">{item.rawName9 || '-'}</td>
         <td className="px-4 py-3 text-center text-[11px] text-slate-600 whitespace-nowrap">{item.rawName10 || '-'}</td>
         
-        {/* Raw Qtys 1-10 */}
-        <td className="px-4 py-3 text-center text-[11px] text-indigo-600 font-bold whitespace-nowrap">{item.rawQty1 || '-'}</td>
-        <td className="px-4 py-3 text-center text-[11px] text-indigo-600 font-bold whitespace-nowrap">{item.rawQty2 || '-'}</td>
-        <td className="px-4 py-3 text-center text-[11px] text-indigo-600 font-bold whitespace-nowrap">{item.rawQty3 || '-'}</td>
-        <td className="px-4 py-3 text-center text-[11px] text-indigo-600 font-bold whitespace-nowrap">{item.rawQty4 || '-'}</td>
-        <td className="px-4 py-3 text-center text-[11px] text-indigo-600 font-bold whitespace-nowrap">{item.rawQty5 || '-'}</td>
-        <td className="px-4 py-3 text-center text-[11px] text-indigo-600 font-bold whitespace-nowrap">{item.rawQty6 || '-'}</td>
-        <td className="px-4 py-3 text-center text-[11px] text-indigo-600 font-bold whitespace-nowrap">{item.rawQty7 || '-'}</td>
-        <td className="px-4 py-3 text-center text-[11px] text-indigo-600 font-bold whitespace-nowrap">{item.rawQty8 || '-'}</td>
-        <td className="px-4 py-3 text-center text-[11px] text-indigo-600 font-bold whitespace-nowrap">{item.rawQty9 || '-'}</td>
-        <td className="px-4 py-3 text-center text-[11px] text-indigo-600 font-bold whitespace-nowrap">{item.rawQty10 || '-'}</td>
+        {/* Raw Quantities 1-10 */}
+        <td className="px-4 py-3 text-center text-[11px] text-indigo-600 font-semibold whitespace-nowrap">{item.rawQty1 || '-'}</td>
+        <td className="px-4 py-3 text-center text-[11px] text-indigo-600 font-semibold whitespace-nowrap">{item.rawQty2 || '-'}</td>
+        <td className="px-4 py-3 text-center text-[11px] text-indigo-600 font-semibold whitespace-nowrap">{item.rawQty3 || '-'}</td>
+        <td className="px-4 py-3 text-center text-[11px] text-indigo-600 font-semibold whitespace-nowrap">{item.rawQty4 || '-'}</td>
+        <td className="px-4 py-3 text-center text-[11px] text-indigo-600 font-semibold whitespace-nowrap">{item.rawQty5 || '-'}</td>
+        <td className="px-4 py-3 text-center text-[11px] text-indigo-600 font-semibold whitespace-nowrap">{item.rawQty6 || '-'}</td>
+        <td className="px-4 py-3 text-center text-[11px] text-indigo-600 font-semibold whitespace-nowrap">{item.rawQty7 || '-'}</td>
+        <td className="px-4 py-3 text-center text-[11px] text-indigo-600 font-semibold whitespace-nowrap">{item.rawQty8 || '-'}</td>
+        <td className="px-4 py-3 text-center text-[11px] text-indigo-600 font-semibold whitespace-nowrap">{item.rawQty9 || '-'}</td>
+        <td className="px-4 py-3 text-center text-[11px] text-indigo-600 font-semibold whitespace-nowrap">{item.rawQty10 || '-'}</td>
       </tr>
     );
   };
@@ -127,20 +120,37 @@ export default function TestingPending({ data, onOpenTestingForm, visibleColumns
           </div>
           <button
             onClick={() => onOpenTestingForm(item.id)}
-            className="px-2 py-0.5 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition text-[9px] font-black"
+            className="px-2.5 py-1 bg-indigo-600 text-white rounded text-[10px] font-black uppercase tracking-wider transition active:scale-95 flex items-center gap-1 shadow-xs"
           >
-            Review
+            <Play size={10} className="fill-current" />
+            <span>Review</span>
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 text-[11px] bg-slate-50 rounded-lg p-2.5 border border-slate-100/50">
+        <div className="grid grid-cols-2 gap-2 text-[11px] bg-slate-50 rounded-lg p-2 border border-slate-100/50">
           <div>
-            <span className="text-gray-400 block uppercase text-[8px] tracking-tight font-black">JC-Job Card</span>
-            <span className="text-slate-800 font-extrabold">{item.jobCardNo}</span>
+            <span className="text-gray-400 block uppercase text-[8px] tracking-tight">Timestamp</span>
+            <span className="text-gray-700 font-medium">{item.timestamp}</span>
           </div>
           <div>
-            <span className="text-gray-400 block uppercase text-[8px] tracking-tight font-black">Date of Prod.</span>
-            <span className="text-slate-900 font-bold">{item.dateOfProduction}</span>
+            <span className="text-gray-400 block uppercase text-[8px] tracking-tight">Job Card No</span>
+            <span className="text-indigo-600 font-black">{item.jobCardNo}</span>
+          </div>
+          <div>
+            <span className="text-gray-400 block uppercase text-[8px] tracking-tight">Product Code</span>
+            <span className="text-indigo-600 font-bold">{item.productCode}</span>
+          </div>
+          <div>
+            <span className="text-gray-400 block uppercase text-[8px] tracking-tight font-black font-semibold">Order Quantity</span>
+            <span className="text-slate-800 font-extrabold">{item.qty} pcs</span>
+          </div>
+          <div>
+            <span className="text-gray-400 block uppercase text-[8px] tracking-tight font-semibold">Date Of Production</span>
+            <span className="text-slate-700 font-medium">{item.dateOfProduction}</span>
+          </div>
+          <div>
+            <span className="text-gray-400 block uppercase text-[8px] tracking-tight font-semibold">Planned 3</span>
+            <span className="text-slate-700 font-medium">{item.planned3 || '-'}</span>
           </div>
         </div>
       </div>
@@ -157,7 +167,7 @@ export default function TestingPending({ data, onOpenTestingForm, visibleColumns
           data={paginatedPending}
           renderRow={renderRow}
           renderCard={renderCard}
-          minWidth="2800px" // Same as production history width
+          minWidth="1400px"
           currentPage={currentPage}
           totalPages={totalPages}
           itemsPerPage={itemsPerPage}

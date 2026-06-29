@@ -35,6 +35,20 @@ export default defineConfig({
             proxyRes.headers['access-control-allow-origin'] = '*';
           });
         }
+      },
+      '/api/indent': {
+        target: 'https://script.google.com',
+        changeOrigin: true,
+        secure: true,
+        followRedirects: true,
+        timeout: 60000,
+        proxyTimeout: 60000,
+        rewrite: (path) => path.replace(/^\/api\/indent/, '/macros/s/AKfycbyAeGslkDmZ3ECE8YN4CPWqd-lWELhijeac3VcsNAlO5Gr45AOLcYah9_HfzdFLzs0'),
+        configure: (proxy) => {
+          proxy.on('proxyRes', (proxyRes) => {
+            proxyRes.headers['access-control-allow-origin'] = '*';
+          });
+        }
       }
     }
   },

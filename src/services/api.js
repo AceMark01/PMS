@@ -5,6 +5,10 @@ const API_URL = import.meta.env.DEV
     ? '/api/gas/exec'
     : import.meta.env.VITE_GOOGLE_SHEETS_API;
 
+const INDENT_API_URL = import.meta.env.DEV
+    ? '/api/indent/exec'
+    : import.meta.env.VITE_INDENT_API;
+
 function getHeaderKey(h) {
     if (!h) return '';
     const clean = h.toString().replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim();
@@ -65,6 +69,33 @@ function getHeaderKey(h) {
     }
     if (upper.includes('DATE OF COMPLETE PRODUCTION') || upper.includes('COMPLETE PRODUCTION')) {
         return 'dateOfCompleteProduction';
+    }
+    if (upper === 'REORDER LEVEL' || upper === 'REORDERLEVEL') {
+        return 'reorderLevel';
+    }
+    if (upper === 'MAX LEVEL' || upper === 'MAX LEVEL.' || upper === 'MAXLEVEL' || upper === 'MAXLAVEL') {
+        return 'maxLevel';
+    }
+    if (upper === 'CLOSING STOCK' || upper === 'CLOSINGSTOCK') {
+        return 'closingStock';
+    }
+    if (upper === 'REORDER QUANTITY' || upper === 'REORDER QTY' || upper === 'REORDERQTY' || upper === 'REORDERQUANTITY') {
+        return 'reorderQty';
+    }
+    if (upper === 'PENDING QUANTITY' || upper === 'PENDING QTY' || upper === 'PENDINGQTY') {
+        return 'pendingQty';
+    }
+    if (upper === 'GODOWN') {
+        return 'godown';
+    }
+    if (upper === 'PRODUCTID' || upper === 'PRODUCT ID') {
+        return 'productID';
+    }
+    if (upper === 'REMARKS') {
+        return 'remarks';
+    }
+    if (upper === 'TIMESTAMP') {
+        return 'timestamp';
     }
     return clean
         .replace(/(?:^\w|[A-Z]|\b\w)/g, (word, index) => index === 0 ? word.toLowerCase() : word.toUpperCase())
@@ -389,6 +420,71 @@ export const productionAPI = {
             return data;
         } catch (error) {
             console.error('api.js: Error uploading file:', error);
+            return { success: false, error: error.message };
+        }
+    }
+};
+
+export const indentAPI = {
+    // Get full sheet data parsed into camelCase objects
+    async getSheetData(sheetName, options = {}) {
+        try {
+            const response = await fetch(INDENT_API_URL, {
+                method: 'POST',
+                mode: 'cors',
+                redirect: 'follow',
+                headers: {
+                    'Content-Type': 'text/plain;charset=utf-8',
+                },
+                body: JSON.stringify({
+                    action: 'read',
+                    sheetName: sheetName
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            if (data.success && data.data) {
+                const headerRow = options.headerRow || 1;
+                const slicedData = data.data.slice(headerRow - 1);
+                const headers = slicedData.length > 0 ? slicedData[0] : [];
+                const records = convert2DArrayToObjects(slicedData, headerRow);
+                return { success: true, records, headers };
+            }
+            return data;
+        } catch (error) {
+            console.error(`Error fetching sheet ${sheetName}:`, error);
+            return { success: false, error: error.message };
+        }
+    },
+
+    // Insert a single row
+    async insertRow(sheetName, rowData) {
+        try {
+            const response = await fetch(INDENT_API_URL, {
+                method: 'POST',
+                mode: 'cors',
+                redirect: 'follow',
+                headers: {
+                    'Content-Type': 'text/plain;charset=utf-8',
+                },
+                body: JSON.stringify({
+                    action: 'insert',
+                    sheetName: sheetName,
+                    rowData: rowData
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            return await response.json();
+        } catch (error) {
+            console.error(`Error inserting row into ${sheetName}:`, error);
             return { success: false, error: error.message };
         }
     }

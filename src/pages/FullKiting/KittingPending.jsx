@@ -12,7 +12,7 @@ export default function KittingPending({ data, visibleColumns = [] }) {
   );
 
   const allHeaders = [
-    "S NO", "Timestamp", "Product code", "Product Name", "BAse Cat", "Order Quantity", "GoDown"
+    "S NO", "Timestamp", "Product code", "Product Name", "BAse Cat", "Order Quantity", "GoDown", "Planned 1"
   ];
 
   const tableHeaders = allHeaders.filter(h => visibleColumns.includes(h));
@@ -21,7 +21,7 @@ export default function KittingPending({ data, visibleColumns = [] }) {
     return (
       <tr key={item.id || idx} className="hover:bg-indigo-50/30 transition-colors border-b border-gray-100">
         <td className="px-4 py-3 text-center text-xs text-gray-600 whitespace-nowrap">{item.sNo}</td>
-        <td className="px-4 py-3 text-center text-xs text-gray-505 text-gray-500 whitespace-nowrap">{item.timestamp}</td>
+        <td className="px-4 py-3 text-center text-xs text-gray-500 whitespace-nowrap">{item.timestamp}</td>
         <td className="px-4 py-3 text-center text-xs text-indigo-600 font-bold whitespace-nowrap">{item.productCode}</td>
         <td className="px-4 py-3 text-center text-xs font-semibold text-gray-900 whitespace-nowrap uppercase">{item.productName}</td>
         <td className="px-4 py-3 text-center text-[11px] text-gray-600 whitespace-nowrap">{item.baseCat}</td>
@@ -29,6 +29,7 @@ export default function KittingPending({ data, visibleColumns = [] }) {
           {Number(item.qty).toLocaleString('en-IN')}
         </td>
         <td className="px-4 py-3 text-center text-xs text-slate-700 font-medium whitespace-nowrap">{item.godown}</td>
+        <td className="px-4 py-3 text-center text-xs text-slate-700 whitespace-nowrap">{item.planned1 || '-'}</td>
       </tr>
     );
   };
@@ -62,9 +63,13 @@ export default function KittingPending({ data, visibleColumns = [] }) {
             <span className="text-gray-400 block uppercase text-[8px] tracking-tight font-black">Order Qty</span>
             <span className="text-indigo-600 font-black">{item.qty}</span>
           </div>
-          <div className="col-span-2">
+          <div>
             <span className="text-gray-400 block uppercase text-[8px] tracking-tight">Godown</span>
             <span className="text-gray-700 font-medium">{item.godown}</span>
+          </div>
+          <div className="col-span-2">
+            <span className="text-gray-400 block uppercase text-[8px] tracking-tight">Planned 1</span>
+            <span className="text-gray-700 font-medium">{item.planned1 || '-'}</span>
           </div>
         </div>
       </div>

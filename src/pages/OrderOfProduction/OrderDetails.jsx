@@ -4,13 +4,35 @@ import { Search, RotateCcw, Filter } from 'lucide-react';
 import DataTable from '../../components/DataTable';
 import SearchableDropdown from '../../components/SearchableDropdown';
 import ColumnToggle from '../../components/ColumnToggle';
-import { productionAPI } from '../../services/api';
+import { productionAPI, indentAPI } from '../../services/api';
+
+const formatDateToDDMMYYYY = (dateStr) => {
+  if (!dateStr || dateStr.trim() === '' || dateStr === '-') return '-';
+  // Check if it matches ISO date-time or similar that can be parsed by Date
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) {
+    // If it cannot be parsed by Date, check if it's already in DD/MM/YYYY or DD-MM-YYYY format
+    const match = dateStr.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/);
+    if (match) {
+      const day = match[1].padStart(2, '0');
+      const month = match[2].padStart(2, '0');
+      const year = match[3];
+      return `${day}-${month}-${year}`;
+    }
+    return dateStr;
+  }
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${day}-${month}-${year}`;
+};
 
 export default function OrderDetails() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [error, setError] = useState(null);
+  const [selectedIds, setSelectedIds] = useState([]);
 
   // Filters State
   const [filters, setFilters] = useState({
@@ -23,6 +45,7 @@ export default function OrderDetails() {
   const [itemsPerPage, setItemsPerPage] = useState(50);
 
   const allHeaders = useMemo(() => [
+    "Select",
     "Timestamp", 
     "S NO", 
     "ProductCode", 
@@ -30,16 +53,13 @@ export default function OrderDetails() {
     "BaseCat", 
     "Order Quantity", 
     "Godown",
-    // "Order Cancel (Pre-Closed)",
-    "Actual Production Planned",
     "Actual Production Done",
-    "Planning Pending Qty",
     "Production Pending Qty",
-    // "Date Of Complete Planning",
-    // "Date Of Complete Production"
+    "Date of completion"
   ], []);
 
   const [visibleColumns, setVisibleColumns] = useState([
+    "Select",
     "Timestamp", 
     "S NO", 
     "ProductCode", 
@@ -47,10 +67,9 @@ export default function OrderDetails() {
     "BaseCat", 
     "Order Quantity", 
     "Godown",
-    "Actual Production Planned",
     "Actual Production Done",
-    "Planning Pending Qty",
     "Production Pending Qty",
+    "Date of completion"
   ]);
 
   const handleToggleColumn = (columnName) => {
@@ -86,11 +105,10 @@ export default function OrderDetails() {
             baseCat: order.baseCat || '',
             qty: order.qty || '',
             godown: order.godown || '',
-            // orderCancel: order.orderCancel || '',
-            actualProductionPlanned: order.actualProductionPlanned || '',
+            orderCancel: order.orderCancel || '',
             actualProductionDone: order.actualProductionDone || '',
-            planningPendingQty: order.planningPendingQty || '',
             productionPendingQty: order.productionPendingQty || '',
+            dateOfCompleteProduction: order.dateOfCompleteProduction || '',
             rowIndex: order.rowIndex
           }));
 
@@ -153,11 +171,110 @@ export default function OrderDetails() {
     currentPage * itemsPerPage
   );
 
-  const tableHeaders = allHeaders.filter(h => visibleColumns.includes(h));
+  const isAllSelected = useMemo(() => {
+    if (paginatedOrders.length === 0) return false;
+    return paginatedOrders.every(item => selectedIds.includes(item.id));
+  }, [paginatedOrders, selectedIds]);
+
+  const handleSelectAllChange = (checked) => {
+    if (checked) {
+      const pageIds = paginatedOrders.map(item => item.id);
+      setSelectedIds(prev => Array.from(new Set([...prev, ...pageIds])));
+    } else {
+      const pageIds = paginatedOrders.map(item => item.id);
+      setSelectedIds(prev => prev.filter(id => !pageIds.includes(id)));
+    }
+  };
+
+  const handleCheckboxChange = (itemId, checked) => {
+    if (checked) {
+      setSelectedIds(prev => [...prev, itemId]);
+    } else {
+      setSelectedIds(prev => prev.filter(id => id !== itemId));
+    }
+  };
+
+  const tableHeaders = useMemo(() => {
+    return allHeaders
+      .map(h => {
+        if (h === 'Select') {
+          return (
+            <input
+              key="select-all"
+              type="checkbox"
+              checked={isAllSelected}
+              onChange={(e) => handleSelectAllChange(e.target.checked)}
+              className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer mx-auto block"
+            />
+          );
+        }
+        return h;
+      })
+      .filter(h => {
+        if (h.key === 'select-all') return true;
+        return visibleColumns.includes(h);
+      });
+  }, [allHeaders, visibleColumns, isAllSelected]);
+
+  const handlePreClose = async () => {
+    alert("You have selected items for Pre-Closing.");
+    const confirmed = window.confirm("Are you sure you want to submit Pre-Closing for the selected records?");
+    if (!confirmed) return;
+
+    const loadToast = toast.loading('Submitting Pre-Closing records...');
+    try {
+      const selectedRecords = orders.filter(o => selectedIds.includes(o.id));
+
+      for (const item of selectedRecords) {
+        const todayDateStr = new Date().toLocaleDateString('en-IN').replace(/\//g, '-');
+        const rowData = [
+          todayDateStr,                      // A: Date
+          item.sNo || '',                    // B: S No
+          item.productCode || '',            // C: Product Code
+          item.productName || '',            // D: Product Name
+          item.baseCat || '',                // E: basecat
+          item.productionPendingQty || '',   // F: Pending Qty
+          '',                                // G: Reorder Level
+          '',                                // H: Max Level
+          '',                                // I: Closing Stock
+          '',                                // J: Reorder Qty
+          '',                                // K
+          '',                                // L
+          '',                                // M
+          '',                                // N
+          '',                                // O
+          '',                                // P
+          item.actualProductionDone || '',   // Q: Total Production
+          item.productionPendingQty || '',   // R: Production Pending Qty
+          item.dateOfCompleteProduction || '' // S: Last Product Date
+        ];
+
+        const res = await indentAPI.insertRow('PreClosed', rowData);
+        if (!res.success) {
+          throw new Error(res.error || 'Failed to submit row');
+        }
+      }
+
+      toast.success('Pre-Closing records successfully submitted!', { id: loadToast });
+      setSelectedIds([]);
+      await fetchOrders();
+    } catch (err) {
+      console.error(err);
+      toast.error(`Failed to submit Pre-Closing: ${err.message || err}`, { id: loadToast });
+    }
+  };
 
   const renderRow = (item, idx) => {
     return (
       <tr key={item.id || idx} className="hover:bg-indigo-50/30 transition-colors border-b border-gray-100">
+        <td className="px-4 py-3 text-center whitespace-nowrap text-xs">
+          <input
+            type="checkbox"
+            checked={selectedIds.includes(item.id)}
+            onChange={(e) => handleCheckboxChange(item.id, e.target.checked)}
+            className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer mx-auto block"
+          />
+        </td>
         <td className="px-4 py-3 text-center text-xs text-gray-500 whitespace-nowrap">{item.timestamp}</td>
         <td className="px-4 py-3 text-center text-xs text-gray-600 whitespace-nowrap">{item.sNo}</td>
         <td className="px-4 py-3 text-center text-xs text-indigo-600 font-bold whitespace-nowrap">{item.productCode}</td>
@@ -165,18 +282,16 @@ export default function OrderDetails() {
         <td className="px-4 py-3 text-center text-[11px] text-gray-600 whitespace-nowrap">{item.baseCat}</td>
         <td className="px-4 py-3 text-center text-xs text-indigo-600 font-bold whitespace-nowrap">{item.qty}</td>
         <td className="px-4 py-3 text-center text-xs text-slate-700 font-medium whitespace-nowrap">{item.godown}</td>
-     
-        <td className="px-4 py-3 text-center text-xs text-slate-700 font-semibold whitespace-nowrap">{item.actualProductionPlanned || '-'}</td>
         <td className="px-4 py-3 text-center text-xs text-slate-700 font-semibold whitespace-nowrap">{item.actualProductionDone || '-'}</td>
-        <td className="px-4 py-3 text-center text-xs text-slate-700 font-semibold whitespace-nowrap">{item.planningPendingQty || '-'}</td>
         <td className="px-4 py-3 text-center text-xs text-slate-700 font-semibold whitespace-nowrap">{item.productionPendingQty || '-'}</td>
+        <td className="px-4 py-3 text-center text-xs text-gray-500 whitespace-nowrap">{formatDateToDDMMYYYY(item.dateOfCompleteProduction)}</td>
       </tr>
     );
   };
 
   const renderCard = (item, idx) => {
     return (
-      <div key={item.id || idx} className="bg-white rounded-xl border border-indigo-50 shadow-sm p-4 space-y-3 transition-all hover:shadow-md hover:border-indigo-100">
+      <div key={item.id || idx} className="bg-white rounded-xl border border-indigo-50 shadow-sm p-4 space-y-3 transition-all hover:shadow-md hover:border-indigo-100 relative">
         <div className="flex justify-between items-center pb-2 border-b border-slate-50">
           <div className="flex items-center gap-2">
             <span className="w-5 h-5 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center text-[10px] font-black text-slate-500">
@@ -184,6 +299,12 @@ export default function OrderDetails() {
             </span>
             <span className="text-xs font-bold text-gray-900 uppercase">{item.productName}</span>
           </div>
+          <input
+            type="checkbox"
+            checked={selectedIds.includes(item.id)}
+            onChange={(e) => handleCheckboxChange(item.id, e.target.checked)}
+            className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
+          />
         </div>
 
         <div className="grid grid-cols-2 gap-2 text-[11px] bg-slate-50 rounded-lg p-2 border border-slate-100/50">
@@ -203,9 +324,21 @@ export default function OrderDetails() {
             <span className="text-gray-400 block uppercase text-[8px] tracking-tight font-black">Order Quantity</span>
             <span className="text-indigo-600 font-black">{item.qty}</span>
           </div>
-          <div className="col-span-2">
-            <span className="text-gray-400 block uppercase text-[8px] tracking-tight">Godown</span>
+          <div>
+            <span className="text-gray-400 block uppercase text-[8px] tracking-tight font-bold">Production Done</span>
+            <span className="text-gray-700 font-medium">{item.actualProductionDone || '-'}</span>
+          </div>
+          <div>
+            <span className="text-gray-400 block uppercase text-[8px] tracking-tight font-bold">Pending Qty</span>
+            <span className="text-amber-600 font-bold">{item.productionPendingQty || '-'}</span>
+          </div>
+          <div>
+            <span className="text-gray-400 block uppercase text-[8px] tracking-tight font-bold">Godown</span>
             <span className="text-gray-700 font-medium">{item.godown}</span>
+          </div>
+          <div className="col-span-2 border-t border-slate-100 pt-1.5 mt-1">
+            <span className="text-gray-400 block uppercase text-[8px] tracking-tight">Date of completion</span>
+            <span className="text-gray-700 font-medium">{formatDateToDDMMYYYY(item.dateOfCompleteProduction)}</span>
           </div>
         </div>
       </div>
@@ -316,10 +449,19 @@ export default function OrderDetails() {
             </button>
 
             <ColumnToggle
-              headers={allHeaders}
+              headers={allHeaders.filter(h => h !== 'Select')}
               visibleColumns={visibleColumns}
               onToggleColumn={handleToggleColumn}
             />
+
+            {selectedIds.length > 0 && (
+              <button
+                onClick={handlePreClose}
+                className="flex bg-rose-600 hover:bg-rose-700 text-white rounded-lg items-center justify-center gap-1.5 transition shadow-sm px-4 py-1.5 md:py-2 text-xs md:text-sm font-bold active:scale-95 whitespace-nowrap flex-shrink-0"
+              >
+                <span>Submit Pre-Closing ({selectedIds.length})</span>
+              </button>
+            )}
 
           </div>
         </div>
@@ -341,7 +483,7 @@ export default function OrderDetails() {
           data={paginatedOrders}
           renderRow={renderRow}
           renderCard={renderCard}
-          minWidth="2200px"
+          minWidth="1400px"
           currentPage={currentPage}
           totalPages={totalPages}
           itemsPerPage={itemsPerPage}

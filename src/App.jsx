@@ -7,9 +7,9 @@ import Settings from './pages/Settings';
 import BOM from './pages/BOM/BOM';
 import Inventory from './pages/Inventory/Inventory';
 import Dasboard from './pages/Dashboard/Dasboard';
+import Indent from './pages/Indent/indent';
 import OrderDetails from './pages/OrderOfProduction/OrderDetails';
 import FullKitting from './pages/FullKiting/FullKitting';
-import FullKittingApproval from './pages/FullKittingApproval/FullKittingApproval';
 import ActualProduction from './pages/ActualProduction/ActualProduction';
 import Testing from './pages/Testing/Testing';
 
@@ -38,9 +38,9 @@ function App() {
             <Route path="settings" element={<Settings />} />
             <Route path="bom" element={<BOM />} />
             <Route path="inventory" element={<Inventory />} />
+            <Route path="indent" element={<Indent />} />
             <Route path="production-orders" element={<OrderDetails />} />
             <Route path="full-kitting" element={<FullKitting />} />
-            <Route path="full-kitting-approval" element={<FullKittingApproval />} />
             <Route path="actual-production" element={<ActualProduction />} />
             <Route path="testing" element={<Testing />} />
           </Route>

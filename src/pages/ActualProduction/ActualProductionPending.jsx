@@ -14,54 +14,31 @@ export default function ActualProductionPending({ data, onOpenProductionForm, vi
 
   const allHeaders = [
     "Action",
-    "JOB Card No.",
     "S NO",
     "Timestamp",
     "Product code",
     "Product Name",
     "BAse Cat",
     "Order Quantity",
-    "Raw Names",
-    "Raw Quantities",
-    "FG Available Qty",
-    "Total Raw Required Qty",
-    "Total Raw Cost",
-    "Extra Amount",
-    "Total Production Cost",
-    "Selling Price",
-    "Profit / Loss Amount",
-    "Profit / Loss %",
-    "Status",
-    "Costing Image"
+    "Godown",
+    "Planned 2"
   ];
 
   const tableHeaders = allHeaders.filter(h => h === 'Action' || visibleColumns.includes(h));
 
   const renderRow = (item, idx) => {
-    const isProfit = item.profitLoss >= 0;
-    const isApproved = item.status && item.status.trim().toLowerCase() === 'approved';
     return (
       <tr key={item.id || idx} className="hover:bg-indigo-50/30 transition-colors border-b border-gray-100">
         {/* Action: Open Production log form */}
         <td className="px-4 py-3 text-center whitespace-nowrap text-xs">
           <button
             onClick={() => onOpenProductionForm(item.id)}
-            className="px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-all active:scale-95 inline-flex items-center gap-1 font-bold text-[10px] shadow-xs"
+            className="px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-all active:scale-95 inline-flex items-center gap-1 font-bold text-[10px] shadow-xs mx-auto"
             title="Log Actual Production"
           >
             <Play size={10} className="fill-current" />
             <span>Produce</span>
           </button>
-        </td>
-        {/* JOB Card No. */}
-        <td className="px-4 py-3 text-center text-xs font-extrabold text-slate-800 whitespace-nowrap">
-          {item.jobCardNo ? (
-            <span className="bg-indigo-50 text-indigo-700 border border-indigo-100 px-2.5 py-0.5 rounded font-black text-[11px]">
-              {item.jobCardNo}
-            </span>
-          ) : (
-            '-'
-          )}
         </td>
         {/* S NO */}
         <td className="px-4 py-3 text-center text-xs text-gray-600 font-semibold">{item.sNo}</td>
@@ -75,54 +52,10 @@ export default function ActualProductionPending({ data, onOpenProductionForm, vi
         <td className="px-4 py-3 text-center text-[11px] text-gray-600">{item.baseCat}</td>
         {/* Order Quantity */}
         <td className="px-4 py-3 text-center text-xs text-slate-800 font-semibold">{item.qty} pcs</td>
-        {/* Raw Names */}
-        <td className="px-4 py-3 text-center text-[11px] text-slate-600 min-w-[220px] whitespace-normal break-words">{item.rawNames}</td>
-        {/* Raw Quantities */}
-        <td className="px-4 py-3 text-center text-[11px] text-slate-600 min-w-[150px] whitespace-normal break-words">{item.rawQuantities}</td>
-        {/* FG Available Qty */}
-        <td className="px-4 py-3 text-center text-xs text-slate-600">{item.fgAvailableQty || 0}</td>
-        {/* Total Raw Required Qty */}
-        <td className="px-4 py-3 text-center text-xs text-indigo-600 font-bold">{Number(item.totalRawRequiredQty).toFixed(3)}</td>
-        {/* Total Raw Cost */}
-        <td className="px-4 py-3 text-center text-xs text-slate-700 font-bold">₹{Number(item.totalRawCost).toLocaleString('en-IN')}</td>
-        {/* Extra Amount */}
-        <td className="px-4 py-3 text-center text-xs text-amber-600 font-semibold">₹{Number(item.extraAmount).toLocaleString('en-IN')}</td>
-        {/* Total Production Cost */}
-        <td className="px-4 py-3 text-center text-xs text-indigo-600 font-extrabold">₹{Number(item.totalProductionCost).toLocaleString('en-IN')}</td>
-        {/* Selling Price */}
-        <td className="px-4 py-3 text-center text-xs text-slate-800 font-bold">₹{Number(item.sellingPrice).toLocaleString('en-IN')}</td>
-        {/* Profit / Loss Amount */}
-        <td className={`px-4 py-3 text-center text-xs font-black ${isProfit ? 'text-emerald-600' : 'text-rose-600'}`}>
-          ₹{Number(item.profitLoss).toLocaleString('en-IN')}
-        </td>
-        {/* Profit / Loss % */}
-        <td className={`px-4 py-3 text-center text-xs font-black ${isProfit ? 'text-emerald-600' : 'text-rose-600'}`}>
-          {Number(item.profitLossPercent).toFixed(2)}%
-        </td>
-        {/* Status */}
-        <td className="px-4 py-3 text-center text-xs whitespace-nowrap">
-          <span className={`px-2.5 py-1 rounded text-[10px] font-black uppercase tracking-wider ${
-            isApproved 
-              ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
-              : 'bg-rose-100 text-rose-800 border border-rose-200'
-          }`}>
-            {item.status || 'Pending'}
-          </span>
-        </td>
-        {/* Costing Image */}
-        <td className="px-4 py-3 text-center min-w-[180px]">
-          {item.costingImage ? (
-            <div className="flex justify-center items-center">
-              <img 
-                src={item.costingImage} 
-                alt="Costing Chart" 
-                className="max-h-[48px] w-auto border border-slate-100 rounded bg-white shadow-xs p-0.5 object-contain"
-              />
-            </div>
-          ) : (
-            <span className="text-[10px] text-gray-400">N/A</span>
-          )}
-        </td>
+        {/* Godown */}
+        <td className="px-4 py-3 text-center text-xs text-slate-700 font-semibold uppercase">{item.godown}</td>
+        {/* Planned 2 */}
+        <td className="px-4 py-3 text-center text-xs text-slate-700 whitespace-nowrap">{item.planned2 || '-'}</td>
       </tr>
     );
   };
@@ -139,20 +72,37 @@ export default function ActualProductionPending({ data, onOpenProductionForm, vi
           </div>
           <button
             onClick={() => onOpenProductionForm(item.id)}
-            className="px-2 py-0.5 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition text-[9px] font-black"
+            className="px-2.5 py-1 bg-indigo-600 text-white rounded text-[10px] font-black uppercase tracking-wider transition active:scale-95 flex items-center gap-1 shadow-xs"
           >
-            Produce
+            <Play size={10} className="fill-current" />
+            <span>Produce</span>
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 text-[11px] bg-slate-50 rounded-lg p-2.5 border border-slate-100/50">
+        <div className="grid grid-cols-2 gap-2 text-[11px] bg-slate-50 rounded-lg p-2 border border-slate-100/50">
           <div>
-            <span className="text-gray-400 block uppercase text-[8px] tracking-tight">JC-Job Card</span>
-            <span className="text-slate-800 font-extrabold">{item.jobCardNo}</span>
+            <span className="text-gray-400 block uppercase text-[8px] tracking-tight">Timestamp</span>
+            <span className="text-gray-700 font-medium">{item.timestamp}</span>
           </div>
           <div>
-            <span className="text-gray-400 block uppercase text-[8px] tracking-tight">Order Quantity</span>
-            <span className="text-gray-900 font-semibold">{item.qty} pcs</span>
+            <span className="text-gray-400 block uppercase text-[8px] tracking-tight">Product Code</span>
+            <span className="text-indigo-600 font-bold">{item.productCode}</span>
+          </div>
+          <div>
+            <span className="text-gray-400 block uppercase text-[8px] tracking-tight">Base Cat</span>
+            <span className="text-gray-700 font-medium">{item.baseCat}</span>
+          </div>
+          <div>
+            <span className="text-gray-400 block uppercase text-[8px] tracking-tight font-black">Order Quantity</span>
+            <span className="text-indigo-600 font-black">{item.qty} pcs</span>
+          </div>
+          <div>
+            <span className="text-gray-400 block uppercase text-[8px] tracking-tight">Godown</span>
+            <span className="text-gray-700 font-semibold uppercase">{item.godown}</span>
+          </div>
+          <div>
+            <span className="text-gray-400 block uppercase text-[8px] tracking-tight">Planned 2</span>
+            <span className="text-gray-700 font-medium">{item.planned2 || '-'}</span>
           </div>
         </div>
       </div>
@@ -169,7 +119,7 @@ export default function ActualProductionPending({ data, onOpenProductionForm, vi
           data={paginatedPending}
           renderRow={renderRow}
           renderCard={renderCard}
-          minWidth="2000px"
+          minWidth="1000px"
           currentPage={currentPage}
           totalPages={totalPages}
           itemsPerPage={itemsPerPage}

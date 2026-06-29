@@ -19,7 +19,7 @@ export default function ActualProduction() {
   const [activeTab, setActiveTab] = useState('pending');
 
   const pendingToggleableHeaders = useMemo(() => [
-    "JOB Card No.", "S NO", "Timestamp", "Product code", "Product Name", "BAse Cat", "Order Quantity", "Raw Names", "Raw Quantities", "FG Available Qty", "Total Raw Required Qty", "Total Raw Cost", "Extra Amount", "Total Production Cost", "Selling Price", "Profit / Loss Amount", "Profit / Loss %", "Status", "Costing Image"
+    "S NO", "Timestamp", "Product code", "Product Name", "BAse Cat", "Order Quantity", "Godown", "Planned 2"
   ], []);
 
   const historyToggleableHeaders = useMemo(() => [
@@ -28,7 +28,7 @@ export default function ActualProduction() {
   ], []);
 
   const [visibleColumns, setVisibleColumns] = useState([
-    "JOB Card No.", "S NO", "Timestamp", "Product code", "Product Name", "BAse Cat", "Order Quantity", "Raw Names", "Raw Quantities", "FG Available Qty", "Total Raw Required Qty", "Total Raw Cost", "Extra Amount", "Total Production Cost", "Selling Price", "Profit / Loss Amount", "Profit / Loss %", "Status", "Costing Image",
+    "S NO", "Timestamp", "Product code", "Product Name", "BAse Cat", "Order Quantity", "Godown", "Planned 2",
     "JC-Job Card", "ProductCode",
     "Raw Name1", "Raw Qty1", "Raw Name2", "Raw Qty2", "Raw Name3", "Raw Qty3", "Raw Name4", "Raw Qty4", "Raw Name5", "Raw Qty5", "Raw Name6", "Raw Qty6", "Raw Name7", "Raw Qty7", "Raw Name8", "Raw Qty8", "Raw Name9", "Raw Qty9", "Raw Name10", "Raw Qty10"
   ]);
@@ -54,75 +54,47 @@ export default function ActualProduction() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [jobCardResult, prodResult, bomResult, invResult, costingResult] = await Promise.all([
-        productionAPI.getSheetData('JOB CARD', { headerRow: 6 }),
+      const [ordersResult, prodResult, bomResult, invResult, costingResult] = await Promise.all([
+        productionAPI.getSheetData('PRODUCTION_ORDERS', { headerRow: 6 }),
         productionAPI.getSheetData('ACTUAL PRODUCTION', { headerRow: 6 }),
         productionAPI.getSheetData('BOM'),
         productionAPI.getSheetData('Live IMS'),
         productionAPI.getSheetData('Costing-History')
       ]);
 
-      if (jobCardResult.success && costingResult.success) {
-        const transformedJobCards = jobCardResult.records.map(record => {
-          const firstSNo = String(record.sNo).split(',')[0]?.trim();
-          const matchedCosting = (costingResult.records || []).find(
-            c => String(c.sNo).trim().split(',')[0]?.trim() === firstSNo
-          );
+      if (ordersResult.success && costingResult.success) {
+        const transformedPending = ordersResult.records
+          .filter(order => {
+            const hasPlanned2 = order.planned2 !== undefined && order.planned2 !== null && order.planned2.toString().trim() !== '';
+            const hasActual2 = order.actual2 !== undefined && order.actual2 !== null && order.actual2.toString().trim() !== '';
+            return hasPlanned2 && !hasActual2;
+          })
+          .map(order => {
+            const firstSNo = String(order.sNo).split(',')[0]?.trim();
+            const matchedCosting = (costingResult.records || []).find(
+              c => String(c.sNo).trim().split(',')[0]?.trim() === firstSNo
+            );
 
-          return {
-            id: record.rowIndex?.toString() || `jc-${record.sNo}`,
-            rowIndex: record.rowIndex,
-            jobCardNo: record.jCJobCard || record['jC-JobCard'] || record.jcJobCard || record.jobCardNo || '',
-            sNo: record.sNo,
-            timestamp: record.timestamp,
-            productCode: record.productCode || '',
-            productName: record.productName || '',
-            qty: Number(record.qty) || 0,
-            dateOfProduction: record.dateOfProduction || '',
-            status: record.approvalStatus || 'Approved',
-            remarks: record.approvalRemarks || '',
-            
-            // Raw materials from JOB CARD row
-            rawName1: record.rawName1 || record.__rowValues?.[9] || '',
-            rawName2: record.rawName2 || record.__rowValues?.[10] || '',
-            rawName3: record.rawName3 || record.__rowValues?.[11] || '',
-            rawName4: record.rawName4 || record.__rowValues?.[12] || '',
-            rawName5: record.rawName5 || record.__rowValues?.[13] || '',
-            rawName6: record.rawName6 || record.__rowValues?.[14] || '',
-            rawName7: record.rawName7 || record.__rowValues?.[15] || '',
-            rawName8: record.rawName8 || record.__rowValues?.[16] || '',
-            rawName9: record.rawName9 || record.__rowValues?.[17] || '',
-            rawName10: record.rawName10 || record.__rowValues?.[18] || '',
-            rawQty1: record.rawQty1 || record.__rowValues?.[19] || '',
-            rawQty2: record.rawQty2 || record.__rowValues?.[20] || '',
-            rawQty3: record.rawQty3 || record.__rowValues?.[21] || '',
-            rawQty4: record.rawQty4 || record.__rowValues?.[22] || '',
-            rawQty5: record.rawQty5 || record.__rowValues?.[23] || '',
-            rawQty6: record.rawQty6 || record.__rowValues?.[24] || '',
-            rawQty7: record.rawQty7 || record.__rowValues?.[25] || '',
-            rawQty8: record.rawQty8 || record.__rowValues?.[26] || '',
-            rawQty9: record.rawQty9 || record.__rowValues?.[27] || '',
-            rawQty10: record.rawQty10 || record.__rowValues?.[28] || '',
-
-            // Costing fields from matching costing history record
-            rawNames: matchedCosting ? (matchedCosting.requiredRawMaterialName || matchedCosting.rawNames || '') : '',
-            rawQuantities: matchedCosting ? (matchedCosting.rawQty || matchedCosting.rawQuantities || '') : '',
-            fgAvailableQty: matchedCosting ? parseStringToNumber(matchedCosting.fGAvailableQty || matchedCosting.fgAvailableQty || 0) : 0,
-            totalRawRequiredQty: matchedCosting ? parseStringToNumber(matchedCosting.totalRawRequiredQty || 0) : 0,
-            totalRawCost: matchedCosting ? parseStringToNumber(matchedCosting.totalRawCost || 0) : 0,
-            extraAmount: matchedCosting ? parseStringToNumber(matchedCosting.extraAmount || 0) : 0,
-            totalProductionCost: matchedCosting ? parseStringToNumber(matchedCosting.totalProductionCost || 0) : 0,
-            sellingPrice: matchedCosting ? parseStringToNumber(matchedCosting.sellingPrice || 0) : 0,
-            profitLoss: matchedCosting ? parseStringToNumber(matchedCosting.profitLoss !== undefined ? matchedCosting.profitLoss : (matchedCosting['profit/LossAmount'] || 0)) : 0,
-            profitLossPercent: matchedCosting ? parseStringToNumber(matchedCosting.profitLossPercent !== undefined ? matchedCosting.profitLossPercent : (matchedCosting['profit/Loss%'] || 0)) : 0,
-            costingImage: matchedCosting ? (matchedCosting.pDFLink || matchedCosting.pdfLink || matchedCosting.costingImage || '') : '',
-            
-            __rowValues: record.__rowValues
-          };
-        });
-        setKittingHistory(transformedJobCards);
+            return {
+              id: order.rowIndex?.toString() || `prod-pending-${order.sNo}`,
+              rowIndex: order.rowIndex,
+              jobCardNo: `JC-${order.sNo}`,
+              sNo: order.sNo,
+              timestamp: order.timestamp,
+              productCode: order.productCode || '',
+              productName: order.productName || '',
+              qty: Number(order.qty) || 0,
+              baseCat: order.baseCat || '',
+              godown: order.godown || '',
+              planned2: order.planned2 || '',
+              rawNames: matchedCosting ? (matchedCosting.requiredRawMaterialName || matchedCosting.rawNames || '') : '',
+              rawQuantities: matchedCosting ? (matchedCosting.rawQty || matchedCosting.rawQuantities || '') : '',
+              status: 'Approved'
+            };
+          });
+        setKittingHistory(transformedPending);
       } else {
-        toast.error(`Failed to load kitting approvals: ${jobCardResult.error || costingResult.error}`);
+        toast.error(`Failed to load pending production: ${ordersResult.error || costingResult.error}`);
       }
 
       if (prodResult.success) {
@@ -134,7 +106,7 @@ export default function ActualProduction() {
           timestamp: record.timestamp,
           productCode: record.productCode || '',
           productName: record.productName || '',
-          qty: Number(record.qty) || 0,
+          qty: Number(record.productionQuantity !== undefined ? record.productionQuantity : (record.qty || 0)),
           dateOfProduction: record.dateOfProduction || '',
           rawName1: record.rawName1 || '',
           rawQty1: record.rawQty1 || '',
@@ -188,17 +160,7 @@ export default function ActualProduction() {
 
   // Filter approved costing cards that are not yet in production history
   const pendingProduction = useMemo(() => {
-    return kittingHistory.filter(row => {
-      // Check col-AG (index 32) is not null/empty
-      const valAG = row.__rowValues && row.__rowValues[32];
-      const hasAG = valAG !== undefined && valAG !== null && valAG.toString().trim() !== '';
-
-      // Check col-AH (index 33) is null/empty
-      const valAH = row.__rowValues && row.__rowValues[33];
-      const hasAH = valAH !== undefined && valAH !== null && valAH.toString().trim() !== '';
-
-      return hasAG && !hasAH;
-    });
+    return kittingHistory;
   }, [kittingHistory]);
 
   // Filter pending items by search query
@@ -254,7 +216,7 @@ export default function ActualProduction() {
   const handleSubmitProduction = async (kittingRecordId, productionRecord) => {
     setLoading(true);
     try {
-      const result = await productionAPI.insertRow('ACTUAL PRODUCTION', productionRecord, { headerRow: 6 });
+      const result = await productionAPI.insertRow('ACTUAL PRODUCTION', productionRecord, { headerRow: 6, generateJobCard: true });
       if (result.success) {
         toast.success('Actual production log successfully submitted!');
         setIsFormOpen(false);

@@ -28,17 +28,15 @@ export default function FullKitting() {
   const [activeTab, setActiveTab] = useState('pending');
 
   const pendingToggleableHeaders = useMemo(() => [
-    "S NO", "Timestamp", "Product code", "Product Name", "BAse Cat", "Order Quantity", "GoDown"
+    "S NO", "Timestamp", "Product code", "Product Name", "BAse Cat", "Order Quantity", "GoDown", "Planned 1"
   ], []);
 
   const historyToggleableHeaders = useMemo(() => [
-    "Ticket ID", "S NO", "Timestamp", "Product code", "Product Name", "BAse Cat", "Order Quantity",
-    "Raw Names", "Raw Quantities", "FG Available Qty", "Total Raw Required Qty", "Total Raw Cost", "Extra Amount", "Total Production Cost", "Selling Price", "Profit / Loss Amount", "Profit / Loss %", "Costing PDF"
+    "S NO", "Timestamp", "Product code", "Product Name", "BAse Cat", "Order Quantity", "GoDown", "Planned 1", "Actual 1"
   ], []);
 
   const [visibleColumns, setVisibleColumns] = useState([
-    "S NO", "Timestamp", "Product code", "Product Name", "BAse Cat", "Order Quantity", "GoDown",
-    "Ticket ID", "Raw Names", "Raw Quantities", "FG Available Qty", "Total Raw Required Qty", "Total Raw Cost", "Extra Amount", "Total Production Cost", "Selling Price", "Profit / Loss Amount", "Profit / Loss %", "Costing PDF"
+    "S NO", "Timestamp", "Product code", "Product Name", "BAse Cat", "Order Quantity", "GoDown", "Planned 1", "Actual 1"
   ]);
 
   const handleToggleColumn = (columnName) => {
@@ -50,7 +48,6 @@ export default function FullKitting() {
   };
 
   const [orders, setOrders] = useState([]);
-  const [kittingHistory, setKittingHistory] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Filter Toolbar States
@@ -64,14 +61,10 @@ export default function FullKitting() {
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      const [result, historyResult] = await Promise.all([
-        productionAPI.getSheetData('PRODUCTION_ORDERS', { headerRow: 6 }),
-        productionAPI.getSheetData('Costing-History')
-      ]);
+      const result = await productionAPI.getSheetData('PRODUCTION_ORDERS', { headerRow: 6 });
 
-      let transformedOrders = [];
       if (result.success) {
-        transformedOrders = result.records.map(order => ({
+        const transformedOrders = result.records.map(order => ({
           id: order.sNo?.toString() || `po-${order.sNo}`,
           sNo: order.sNo,
           timestamp: order.timestamp,
@@ -80,49 +73,12 @@ export default function FullKitting() {
           baseCat: order.baseCat || '',
           qty: Number(order.qty) || 0,
           godown: order.godown || '',
-          checkJc: order.checkJc || '',
           planned1: order.planned1 || '',
           actual1: order.actual1 || ''
         }));
         setOrders(transformedOrders);
       } else {
         toast.error(`Failed to load orders: ${result.error}`);
-      }
-
-      if (historyResult.success) {
-        const transformedHistory = (historyResult.records || []).map(record => {
-          const firstSNo = String(record.sNo).split(',')[0]?.trim();
-          const matchedOrder = transformedOrders.find(o => String(o.sNo).trim() === firstSNo);
-
-          return {
-            id: record.rowIndex?.toString() || `hist-${record.sNo}`,
-            rowIndex: record.rowIndex,
-            kittingTicket: record.kittingTicket || '',
-            sNo: record.sNo,
-            timestamp: record.timestamp,
-            productCode: matchedOrder ? matchedOrder.productCode : '',
-            productName: matchedOrder ? matchedOrder.productName : (record.fGName || record.fgName || ''),
-            baseCat: matchedOrder ? matchedOrder.baseCat : '',
-            qty: parseStringToNumber(record.planQty || record.qty || (matchedOrder ? matchedOrder.qty : 0)),
-            rawNames: record.requiredRawMaterialName || record.rawNames || '',
-            rawQuantities: record.rawQty || record.rawQuantities || '',
-            fgAvailableQty: parseStringToNumber(record.fGAvailableQty || record.fgAvailableQty || 0),
-            totalRawRequiredQty: parseStringToNumber(record.totalRawRequiredQty || 0),
-            totalRawCost: parseStringToNumber(record.totalRawCost || 0),
-            extraAmount: parseStringToNumber(record.extraAmount || 0),
-            totalProductionCost: parseStringToNumber(record.totalProductionCost || 0),
-            sellingPrice: parseStringToNumber(record.sellingPrice || 0),
-            profitLoss: parseStringToNumber(record.profitLoss !== undefined ? record.profitLoss : (record['profit/LossAmount'] || 0)),
-            profitLossPercent: parseStringToNumber(record.profitLossPercent !== undefined ? record.profitLossPercent : (record['profit/Loss%'] || 0)),
-            pdfLink: record.pdfLink || record.pDFLink || record.costingImage || record.__rowValues?.[18] || '',
-            status: matchedOrder
-              ? (matchedOrder.checkJc ? (matchedOrder.checkJc.toLowerCase() === 'rejected' ? 'Rejected' : 'Approved') : 'Pending')
-              : 'Pending'
-          };
-        });
-        setKittingHistory(transformedHistory);
-      } else {
-        toast.error(`Failed to load kitting history: ${historyResult.error}`);
       }
     } catch (err) {
       console.error(err);
@@ -142,6 +98,15 @@ export default function FullKitting() {
       const hasPlanned1 = order.planned1 !== undefined && order.planned1 !== null && order.planned1.toString().trim() !== '';
       const hasActual1 = order.actual1 !== undefined && order.actual1 !== null && order.actual1.toString().trim() !== '';
       return hasPlanned1 && !hasActual1;
+    });
+  }, [orders]);
+
+  // Filter orders where Planned 1 is not null and Actual 1 is not null
+  const kittingHistory = useMemo(() => {
+    return orders.filter(order => {
+      const hasPlanned1 = order.planned1 !== undefined && order.planned1 !== null && order.planned1.toString().trim() !== '';
+      const hasActual1 = order.actual1 !== undefined && order.actual1 !== null && order.actual1.toString().trim() !== '';
+      return hasPlanned1 && hasActual1;
     });
   }, [orders]);
 
@@ -177,7 +142,7 @@ export default function FullKitting() {
           record.productCode.toLowerCase().includes(q) ||
           record.productName.toLowerCase().includes(q) ||
           record.baseCat.toLowerCase().includes(q) ||
-          record.rawNames.toLowerCase().includes(q)
+          record.godown.toLowerCase().includes(q)
         );
       }
       return true;
@@ -279,35 +244,7 @@ export default function FullKitting() {
     }
   };
 
-  const handleDeleteHistory = async (historyId) => {
-    if (window.confirm('Are you sure you want to delete this costing record? This will revert the production order back to Pending.')) {
-      const record = kittingHistory.find(h => h.id === historyId);
-      if (!record) return;
 
-      const sNos = String(record.sNo).split(',').map(s => Number(s.trim())).filter(Boolean);
-
-      const loadToast = toast.loading('Reverting costing card from Google Sheets...');
-      try {
-        const historyResult = await productionAPI.getSheetData('Costing-History');
-        if (historyResult.success && historyResult.records) {
-          const matches = historyResult.records
-            .filter(r => sNos.includes(Number(r.sNo)))
-            .map(r => r.rowIndex);
-
-          matches.sort((a, b) => b - a);
-          for (const rowIndex of matches) {
-            await productionAPI.deleteRow('Costing-History', rowIndex);
-          }
-        }
-
-        toast.success('Record reverted to pending successfully!', { id: loadToast });
-        await fetchOrders();
-      } catch (err) {
-        console.error(err);
-        toast.error('Failed to revert costing card.', { id: loadToast });
-      }
-    }
-  };
 
   const tabs = [
     { id: 'pending', label: 'Pending Kitting', count: pendingOrders.length, icon: ClipboardList },
@@ -397,7 +334,6 @@ export default function FullKitting() {
         ) : (
           <KittingHistory
             data={filteredHistory}
-            onDeleteHistory={handleDeleteHistory}
             visibleColumns={visibleColumns}
           />
         )}
