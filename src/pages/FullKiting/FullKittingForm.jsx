@@ -777,28 +777,33 @@ export default function FullKittingForm({ isOpen, onClose, onSave, pendingOrders
                                 </td>
                                 <td className="px-4 py-2.5 text-center font-medium text-slate-900">
                                   {row.isSubstitute ? (
-                                    <select
-                                      value={row.rawName}
-                                      onChange={(e) => handleSelectSubstituteMaterial(index, e.target.value)}
-                                      className="w-full max-w-[200px] px-2 py-1 border border-indigo-200 rounded text-center focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 text-xs font-bold text-indigo-700 bg-indigo-50/30 inline-block cursor-pointer"
-                                      required
-                                    >
-                                      {substituteBOMs.map((m, mIdx) => (
-                                        <option key={mIdx} value={m.rawItemName}>{m.rawItemName}</option>
-                                      ))}
-                                    </select>
+                                    <div className="w-full max-w-[200px] mx-auto text-left">
+                                      <SearchableDropdown
+                                        options={substituteBOMs.map((m) => ({
+                                          value: m.rawItemName,
+                                          label: m.itemCode ? `${m.rawItemName} (${m.itemCode})` : m.rawItemName
+                                        }))}
+                                        value={row.rawName}
+                                        onChange={(val) => handleSelectSubstituteMaterial(index, val)}
+                                        placeholder="Select Substitute"
+                                        height="h-[28px]"
+                                        rounded="rounded"
+                                      />
+                                    </div>
                                   ) : row.isCustom ? (
-                                    <select
-                                      value={row.rawName}
-                                      onChange={(e) => handleSelectRawMaterial(index, e.target.value)}
-                                      className="w-full max-w-[200px] px-2 py-1 border border-gray-200 rounded text-center focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 text-xs font-semibold text-slate-800 bg-white inline-block cursor-pointer"
-                                      required
-                                    >
-                                      <option value="">-- Select Material --</option>
-                                      {uniqueRawMaterials.map((m, mIdx) => (
-                                        <option key={mIdx} value={m.rawItemName}>{m.rawItemName}</option>
-                                      ))}
-                                    </select>
+                                    <div className="w-full max-w-[200px] mx-auto text-left">
+                                      <SearchableDropdown
+                                        options={uniqueRawMaterials.map((m) => ({
+                                          value: m.rawItemName,
+                                          label: m.itemCode ? `${m.rawItemName} (${m.itemCode})` : m.rawItemName
+                                        }))}
+                                        value={row.rawName}
+                                        onChange={(val) => handleSelectRawMaterial(index, val)}
+                                        placeholder="-- Select Material --"
+                                        height="h-[28px]"
+                                        rounded="rounded"
+                                      />
+                                    </div>
                                   ) : (
                                     `${row.rawName} (${row.itemCode})`
                                   )}
